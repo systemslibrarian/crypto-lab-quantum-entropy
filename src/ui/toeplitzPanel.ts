@@ -1,10 +1,11 @@
+import { blockMinEntropy } from '../entropy/blockentropy.ts'
 import { fractionOnes, markovPredictorAccuracy, minEntropy } from '../entropy/measures.ts'
 import { lhlEpsilon, toeplitzExtract } from '../entropy/toeplitz.ts'
 import type { ToeplitzResult } from '../entropy/types.ts'
-import { $, bitsToHex, fmt, html, sci } from './dom.ts'
-import { state, subscribe } from './state.ts'
+import { $, bitsToHex, fmt, html, pct, sci } from './dom.ts'
+import { BLOCK_LEN, state, subscribe } from './state.ts'
 
-const N = 256 // input bits taken from the raw stream
+const N = BLOCK_LEN // input bits taken from the raw stream
 const VIZ_ROWS = 12
 const VIZ_COLS = 28
 const CELL = 11
@@ -18,10 +19,13 @@ export function initToeplitzPanel(root: HTMLElement): void {
     <p class="lede">
       A Toeplitz matrix over GF(2) is a 2-universal hash: multiply your n dirty bits by a random
       m×n matrix and the Leftover Hash Lemma guarantees the m output bits are within statistical
-      distance ε of uniform — <em>provided</em> m stays below the min-entropy k you actually have.
-      The multiply below is a real GF(2) matrix–vector product on the first ${N} bits of the raw
-      stream. Choose the output length, then extract — and try demanding more bits than the stream
-      contains.
+      distance ε of uniform — <em>provided</em> m stays below the min-entropy k of the input
+      <em>distribution</em>. That k comes from the configured source model (the exact probability
+      of its single most likely ${N}-bit path), never from statistics measured on the sample being
+      extracted — measuring your own input and calling it a guarantee is the classic accounting
+      sin. The multiply below is a real GF(2) matrix–vector product on the first ${N} bits of the
+      raw stream. Choose the output length, then extract — and try demanding more bits than the
+      model contains.
     </p>
     <div class="controls">
       <div class="field">
@@ -30,14 +34,15 @@ export function initToeplitzPanel(root: HTMLElement): void {
       </div>
       <button id="tp-extract">Draw fresh seed &amp; extract</button>
     </div>
-    <div class="stat-grid" role="status" aria-live="polite" id="tp-stats"></div>
+    <p class="note" id="tp-gate-note"></p>
+    <div class="stat-grid" id="tp-stats"></div>
     <h3>The entropy budget</h3>
     <div class="chart-wrap">
       <svg viewBox="0 0 440 84" role="img" id="tp-budget" aria-label=""></svg>
       <p class="note" style="margin: 0.3rem 0 0">
-        The ledger the lemma enforces: of ${N} raw bits, only k carry min-entropy, and every output
-        bit is drawn against k — never against ${N}. Demand past the shaded funds and you are
-        withdrawing uniformity that was never deposited.
+        The ledger the lemma enforces: of ${N} raw bits, only k carry min-entropy under the
+        configured model, and every output bit is drawn against k — never against ${N}. Demand
+        past the shaded funds and you are withdrawing uniformity that was never deposited.
       </p>
     </div>
     <div class="verdict-pair" role="status" aria-live="polite" id="tp-verdicts"></div>
@@ -58,18 +63,26 @@ export function initToeplitzPanel(root: HTMLElement): void {
     <details>
       <summary>The Leftover Hash Lemma receipt, line by line</summary>
       <div>
-        <p><span class="formula">ε ≤ ½·√(2^(m−k))</span> &nbsp;equivalently&nbsp;
-           <span class="formula">m ≤ k − 2·log₂(1/ε)</span></p>
+        <p><span class="formula">ε(k, m) = ½·√(2^(m−k))</span> &nbsp;solved exactly for m:&nbsp;
+           <span class="formula">distance ≤ ε ⟺ m ≤ k + 2 − 2·log₂(1/ε)</span></p>
         <p class="note">
-          Three consequences, all visible above. (1) <strong>You cannot extract more than you
-          have:</strong> as m approaches k the guarantee evaporates — ε is a bound on how well ANY
-          distinguisher can tell your output from uniform, and once ε is large the bound says
-          nothing. (2) <strong>The extractor needs its own seed:</strong> the m+${N}−1 matrix bits
-          are drawn fresh and uniform from the browser CSPRNG — the extractor spends clean
-          randomness to launder dirty randomness; it cannot create any. Because Toeplitz hashing is
-          a <em>strong</em> extractor, that seed may be public and reused across independent
-          inputs. (3) <strong>The output length is a security parameter, not a throughput
-          choice:</strong> picking m is picking ε.
+          One convention, carried through code, tests, and this page. (The folk rule
+          m ≤ k − 2·log₂(1/ε) is the same statement with an extra 2-bit safety margin — it
+          guarantees distance ≤ ε/2.) Three consequences, all visible above. (1) <strong>You
+          cannot extract more than you have:</strong> as m approaches k the guarantee evaporates —
+          ε bounds how well ANY distinguisher can tell your output from uniform, and once ε is
+          large the bound says nothing. (2) <strong>The extractor needs its own seed:</strong> the
+          m+${N}−1 matrix bits are drawn fresh and uniform from the browser CSPRNG — the extractor
+          spends clean randomness to launder dirty randomness; it cannot create any. Because
+          Toeplitz hashing is a <em>strong</em> extractor, that seed may be public and reused
+          across independent inputs. (3) <strong>The output length is a security parameter, not a
+          throughput choice:</strong> picking m is picking ε.
+        </p>
+        <p class="note">
+          Standards footnote: in SP 800-90B terms, Toeplitz universal hashing is sound extractor
+          mathematics, but it is <em>not</em> one of the spec’s listed vetted conditioning
+          components (§3.1.5.1). Its guarantee here comes from the Leftover Hash Lemma and a valid
+          k — not from appearing in a standards table.
         </p>
         <div id="tp-row0" class="note"></div>
       </div>
@@ -81,74 +94,68 @@ export function initToeplitzPanel(root: HTMLElement): void {
   let last: ToeplitzResult | null = null
   let lastM = 0
 
-  function kEstimate(): { k: number; basis: string } {
-    const raw = state.raw
-    const input = raw.subarray(0, N)
-    if (input.length < N) return { k: 0, basis: 'no stream yet' }
-    const p = fractionOnes(raw)
-    const hBias = minEntropy(p)
-    // The measured predictor bound only applies when correlation actually exists —
-    // on an i.i.d. stream it would nose below the bias bound by pure overfitting.
-    const correlated = state.cfg.persistence > 0
-    const acc = markovPredictorAccuracy(raw)
-    const hPred = acc > 0 && acc < 1 ? -Math.log2(acc) : 0
-    const h = correlated ? Math.min(hBias, hPred) : hBias
-    return {
-      k: N * h,
-      basis:
-        h === hBias
-          ? `k = ${N} × H∞(bias) = ${N} × ${fmt(hBias)}`
-          : `k = ${N} × H∞(predictor) = ${N} × ${fmt(hPred)} — correlation, not bias, is the binding constraint`,
-    }
+  function modelK(): number {
+    return blockMinEntropy(N, state.cfg)
   }
 
   function renderAccounting(): void {
     const m = Number(mSlider.value)
     $('#tp-m-out', root).textContent = String(m)
-    const { k, basis } = kEstimate()
+    const k = modelK()
     const eps = lhlEpsilon(k, m)
     const margin = k - m
 
+    const raw = state.raw
+    const pHat = fractionOnes(raw)
+    const acc = markovPredictorAccuracy(raw)
     $('#tp-stats', root).innerHTML = `
-      <div class="stat"><span class="label">Min-entropy in, k</span>
+      <div class="stat"><span class="label">Model min-entropy in, k</span>
         <span class="value">${fmt(k, 1)} bits</span>
-        <span class="note">${basis}</span></div>
+        <span class="note">−log₂ P(most likely ${N}-bit path) of the configured model</span></div>
       <div class="stat"><span class="label">Bits demanded, m</span>
         <span class="value">${m}</span></div>
       <div class="stat"><span class="label">Security margin k − m</span>
         <span class="value">${fmt(margin, 1)} bits</span></div>
       <div class="stat"><span class="label">Distance from uniform ε ≤</span>
         <span class="value">${eps >= 1 ? '≥ 1 (vacuous)' : sci(eps)}</span></div>
+      <div class="stat"><span class="label">Observed sample (diagnostics only)</span>
+        <span class="value">p̂ = ${pct(pHat)}</span>
+        <span class="note">bias-only H∞(p̂) = ${fmt(minEntropy(pHat))}/bit; first-order predictor
+        ${pct(acc)} — measured on this one sample, never part of the budget</span></div>
     `
 
-    renderBudget(m, k)
+    const blocked = state.health.latched
+    ;($('#tp-extract', root) as HTMLButtonElement).disabled = blocked
+    $('#tp-gate-note', root).innerHTML = blocked
+      ? '<strong>Blocked by the source boundary:</strong> a health alarm is latched (panel 5). A real conditioner never accepts material from an alarmed source — repair and recommission first.'
+      : ''
 
-    const ranNote = last
-      ? `${lastM} bits produced — the GF(2) multiply always runs fine.`
-      : 'Not extracted yet.'
     const level = eps <= Math.pow(2, -32) ? 'ok' : eps <= Math.pow(2, -10) ? 'warn' : 'alarm'
     $('#tp-verdicts', root).innerHTML = `
       <div class="verdict-box neutral">
         <p class="vb-title">Extractor result (the math)</p>
         <p class="vb-main">${last ? `${lastM} bits output ✓` : '—'}</p>
-        <p class="vb-note">${ranNote} Producing output is not evidence of security.</p>
+        <p class="vb-note">${
+          last ? `${lastM} bits produced — the GF(2) multiply always runs fine.` : 'Not extracted yet.'
+        } Producing output is not evidence of security.</p>
       </div>
       <div class="verdict-box ${level}">
-        <p class="vb-title">Security verdict (the lemma)</p>
+        <p class="vb-title">Policy verdict on the lemma’s bound</p>
         <p class="vb-main">${
           level === 'ok'
-            ? `✓ ε ≤ ${sci(eps)} — indistinguishable in practice`
+            ? `✓ ε ≤ ${sci(eps)} — below this lab’s 2⁻³² accept line`
             : level === 'warn'
-              ? `⚠ ε ≤ ${sci(eps)} — thin margin, not key-grade`
-              : `✕ REJECT — ${eps >= 1 ? 'no guarantee at all' : `ε ≤ ${sci(eps)} is far too large`}`
+              ? `⚠ ε ≤ ${sci(eps)} — thin margin under this lab’s policy`
+              : `✕ REJECT — ${eps >= 1 ? 'the bound is vacuous' : `ε ≤ ${sci(eps)} is far above the accept line`}`
         }</p>
         <p class="vb-note">${
           level === 'alarm'
-            ? `You demanded m = ${m} bits from k = ${fmt(k, 1)} bits of min-entropy. The output below still looks perfectly random — that is exactly why the accounting, not the appearance, is the verdict.`
-            : `ε bounds every distinguisher’s advantage. Margin of ${fmt(margin, 1)} bits ⇒ ε ≤ ½·2^−${fmt(margin / 2, 1)}.`
+            ? `You demanded m = ${m} bits from k = ${fmt(k, 1)} bits of model min-entropy. The output below still looks perfectly random — that is exactly why the accounting, not the appearance, is the verdict.`
+            : `The lemma supplies the bound; the 2⁻³²/2⁻¹⁰ lines are this lab’s teaching policy, not part of the theorem. Margin ${fmt(margin, 1)} bits ⇒ ε ≤ ½·2^−${fmt(margin / 2, 1)}.`
         }</p>
       </div>
     `
+    renderBudget(m, k)
   }
 
   function renderBudget(m: number, k: number): void {
@@ -159,7 +166,7 @@ export function initToeplitzPanel(root: HTMLElement): void {
     const overdraft = m > k
     svg.setAttribute(
       'aria-label',
-      `Entropy budget bar: of ${N} raw bits, k = ${k.toFixed(1)} bits of min-entropy are available. ` +
+      `Entropy budget bar: of ${N} raw bits, the model provides k = ${k.toFixed(1)} bits of min-entropy. ` +
         (overdraft
           ? `You demanded m = ${m} bits — an overdraft of ${(m - k).toFixed(1)} bits past the available entropy.`
           : `You demanded m = ${m} bits, leaving a security margin of ${(k - m).toFixed(1)} bits.`),
@@ -184,6 +191,7 @@ export function initToeplitzPanel(root: HTMLElement): void {
   }
 
   function extract(): void {
+    if (state.health.latched) return // fail closed even if the disabled state is bypassed
     const m = Number(mSlider.value)
     const input = state.raw.subarray(0, N)
     if (input.length < N) return

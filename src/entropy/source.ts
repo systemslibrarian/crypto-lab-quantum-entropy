@@ -10,8 +10,10 @@ import type { BitStream, SourceConfig } from './types.ts'
  *
  * The model: each photon lands on detector B (bit = 1) with probability pOne
  * (detector-efficiency mismatch), and with probability `persistence` the
- * detector simply repeats its last click (dead-time / afterpulsing), which
- * introduces lag-1 correlation while leaving the marginal bias at exactly pOne.
+ * output simply repeats its last bit (a repeat-or-fresh Markov model — a
+ * deliberately simple stand-in for correlation effects; real afterpulsing and
+ * dead-time physics behave differently). This introduces lag-1 correlation
+ * while leaving the marginal bias at exactly pOne.
  */
 export function generateBits(
   n: number,

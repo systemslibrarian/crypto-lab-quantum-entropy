@@ -18,6 +18,7 @@ const ALPHA_EXP = 20 // α = 2^-20, the SP 800-90B recommended false-positive ra
  * source (H = 1): C = 21. The spec's own worked example: H = 7.3 → C = 4.
  */
 export function rctCutoff(h: number): number {
+  if (!(h > 0)) throw new Error(`claimed min-entropy must be positive, got ${h}`)
   return 1 + Math.ceil(ALPHA_EXP / h)
 }
 
@@ -43,6 +44,8 @@ export function runRCT(bits: BitStream, cutoff: number): RCTResult {
 export const APT_WINDOW = 1024
 
 export function aptCutoff(h: number, w: number = APT_WINDOW): number {
+  if (!(h > 0)) throw new Error(`claimed min-entropy must be positive, got ${h}`)
+  if (!Number.isInteger(w) || w < 2) throw new Error(`window must be an integer ≥ 2, got ${w}`)
   return 1 + critBinom(w, Math.pow(2, -h), 1 - Math.pow(2, -ALPHA_EXP))
 }
 
@@ -60,6 +63,103 @@ export function critBinom(n: number, p: number, target: number): number {
     if (cdf >= target) return x
   }
   return n
+}
+
+/**
+ * Stateful Repetition Count Test monitor. A real source runs this continuously
+ * across its whole lifetime; run state survives arbitrary chunk boundaries and
+ * the alarm LATCHES — it clears only via an explicit operator reset.
+ */
+export class RCTMonitor {
+  readonly cutoff: number
+  private prev = -1
+  private run = 0
+  private samples = 0
+  maxRun = 0
+  /** Absolute sample index (lifetime) where the alarm first fired, or null. */
+  failedAt: number | null = null
+
+  constructor(cutoff: number) {
+    if (!Number.isInteger(cutoff) || cutoff < 2) {
+      throw new Error(`RCT cutoff must be an integer ≥ 2, got ${cutoff}`)
+    }
+    this.cutoff = cutoff
+  }
+
+  get alarmed(): boolean {
+    return this.failedAt !== null
+  }
+
+  get samplesSeen(): number {
+    return this.samples
+  }
+
+  feed(bits: BitStream): void {
+    for (let i = 0; i < bits.length; i++) {
+      this.run = bits[i] === this.prev ? this.run + 1 : 1
+      this.prev = bits[i]
+      if (this.run > this.maxRun) this.maxRun = this.run
+      if (this.run >= this.cutoff && this.failedAt === null) this.failedAt = this.samples
+      this.samples++
+    }
+  }
+}
+
+/**
+ * Stateful Adaptive Proportion Test monitor: disjoint windows of W samples
+ * across the source lifetime, reference = first sample of each window; the
+ * alarm latches when the reference's count in a window reaches the cutoff.
+ */
+export class APTMonitor {
+  readonly cutoff: number
+  readonly window: number
+  private ref = -1
+  private count = 0
+  private pos = 0
+  private samples = 0
+  maxCount = 0
+  windowsCompleted = 0
+  /** Window index (lifetime) where the alarm first fired, or null. */
+  failedWindow: number | null = null
+
+  constructor(cutoff: number, window: number = APT_WINDOW) {
+    if (!Number.isInteger(cutoff) || cutoff < 2) {
+      throw new Error(`APT cutoff must be an integer ≥ 2, got ${cutoff}`)
+    }
+    if (!Number.isInteger(window) || window < 2) {
+      throw new Error(`APT window must be an integer ≥ 2, got ${window}`)
+    }
+    this.cutoff = cutoff
+    this.window = window
+  }
+
+  get alarmed(): boolean {
+    return this.failedWindow !== null
+  }
+
+  get samplesSeen(): number {
+    return this.samples
+  }
+
+  feed(bits: BitStream): void {
+    for (let i = 0; i < bits.length; i++) {
+      if (this.pos === 0) {
+        this.ref = bits[i]
+        this.count = 0
+      }
+      if (bits[i] === this.ref) this.count++
+      if (this.count > this.maxCount) this.maxCount = this.count
+      if (this.count >= this.cutoff && this.failedWindow === null) {
+        this.failedWindow = this.windowsCompleted
+      }
+      this.pos++
+      this.samples++
+      if (this.pos === this.window) {
+        this.pos = 0
+        this.windowsCompleted++
+      }
+    }
+  }
 }
 
 /**

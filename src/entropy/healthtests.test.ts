@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { APT_WINDOW, aptCutoff, critBinom, rctCutoff, runAPT, runRCT } from './healthtests.ts'
+import {
+  APT_WINDOW,
+  APTMonitor,
+  aptCutoff,
+  critBinom,
+  RCTMonitor,
+  rctCutoff,
+  runAPT,
+  runRCT,
+} from './healthtests.ts'
 import { generateBits, makeTestRng } from './source.ts'
 
 describe('SP 800-90B §4.4.1 Repetition Count Test', () => {
@@ -68,5 +77,88 @@ describe('SP 800-90B §4.4.2 Adaptive Proportion Test', () => {
     )
     expect(runRCT(bits, rctCutoff(1)).failedAt).toBeNull()
     expect(runAPT(bits, aptCutoff(1)).failedWindow).not.toBeNull()
+  })
+})
+
+describe('stateful monitors — run/window state must survive any chunking', () => {
+  // A stream whose only failure (a 21-run) straddles position 1000
+  function failingStream(): Uint8Array {
+    const bits = generateBits(2048, { pOne: 0.5, persistence: 0, stuck: null }, makeTestRng(23))
+    for (let i = 990; i < 1011; i++) bits[i] = 1
+    // ensure the run is exactly 21, bounded by 0s
+    bits[989] = 0
+    bits[1011] = 0
+    return bits
+  }
+
+  it('RCT alarms at the identical absolute sample for EVERY possible chunk split', () => {
+    const bits = failingStream()
+    const whole = new RCTMonitor(21)
+    whole.feed(bits)
+    expect(whole.failedAt).toBe(1010) // 21st bit of the run, 0-indexed lifetime position
+    for (let split = 0; split <= bits.length; split += 64) {
+      const m = new RCTMonitor(21)
+      m.feed(bits.subarray(0, split))
+      m.feed(bits.subarray(split))
+      expect(m.failedAt).toBe(whole.failedAt)
+      expect(m.maxRun).toBe(whole.maxRun)
+    }
+    // exhaustive around the failure itself
+    for (let split = 985; split <= 1015; split++) {
+      const m = new RCTMonitor(21)
+      m.feed(bits.subarray(0, split))
+      m.feed(bits.subarray(split))
+      expect(m.failedAt).toBe(whole.failedAt)
+    }
+  })
+
+  it('APT window state carries across chunks: same alarm window at every split', () => {
+    // stuck stream: first full window alarms
+    const bits = new Uint8Array(APT_WINDOW + 512).fill(0)
+    const whole = new APTMonitor(589)
+    whole.feed(bits)
+    expect(whole.failedWindow).toBe(0)
+    for (const split of [1, 100, 588, 589, 1000, 1024, 1500]) {
+      const m = new APTMonitor(589)
+      m.feed(bits.subarray(0, split))
+      m.feed(bits.subarray(split))
+      expect(m.failedWindow).toBe(0)
+    }
+  })
+
+  it('a batch reset every 4,096 bits misses what the continuous monitor catches', () => {
+    // 20 identical bits at the end of chunk A + 10 at the start of chunk B: a 30-run
+    const a = generateBits(4096, { pOne: 0.5, persistence: 0, stuck: null }, makeTestRng(29))
+    const b = generateBits(4096, { pOne: 0.5, persistence: 0, stuck: null }, makeTestRng(31))
+    for (let i = 4076; i < 4096; i++) a[i] = 1
+    a[4075] = 0
+    for (let i = 0; i < 10; i++) b[i] = 1
+    b[10] = 0
+    // per-chunk batch evaluation sees runs of only 20 and 10 — no alarm
+    expect(runRCT(a, 21).failedAt).toBeNull()
+    expect(runRCT(b, 21).failedAt).toBeNull()
+    // the continuous monitor sees the 30-run across the boundary and alarms
+    const m = new RCTMonitor(21)
+    m.feed(a)
+    m.feed(b)
+    expect(m.alarmed).toBe(true)
+    expect(m.failedAt).toBe(4096) // 21st bit of the run: 20 in chunk A + 1st of chunk B
+  })
+
+  it('the alarm latches: healthy bits after a failure do not clear it', () => {
+    const m = new RCTMonitor(21)
+    m.feed(new Uint8Array(64).fill(1))
+    expect(m.alarmed).toBe(true)
+    m.feed(generateBits(4096, { pOne: 0.5, persistence: 0, stuck: null }, makeTestRng(37)))
+    expect(m.alarmed).toBe(true)
+    expect(m.failedAt).toBe(20)
+  })
+
+  it('rejects invalid cutoffs and windows (fail closed)', () => {
+    expect(() => new RCTMonitor(1)).toThrow(/≥ 2/)
+    expect(() => new APTMonitor(589, 1)).toThrow(/≥ 2/)
+    expect(() => rctCutoff(0)).toThrow(/positive/)
+    expect(() => rctCutoff(-1)).toThrow(/positive/)
+    expect(() => aptCutoff(0)).toThrow(/positive/)
   })
 })

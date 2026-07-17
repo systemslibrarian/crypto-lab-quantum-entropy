@@ -1,3 +1,4 @@
+import { blockMinEntropy } from '../entropy/blockentropy.ts'
 import {
   fractionOnes,
   markovPredictorAccuracy,
@@ -5,7 +6,7 @@ import {
   shannonEntropy,
 } from '../entropy/measures.ts'
 import { $, fmt, html, pct } from './dom.ts'
-import { subscribe } from './state.ts'
+import { BLOCK_LEN, subscribe } from './state.ts'
 
 /** Chart geometry: p ∈ [0.5, 1] → x, entropy ∈ [0, 1] → y. */
 const W = 460
@@ -36,7 +37,7 @@ export function initEntropyPanel(root: HTMLElement): void {
       trying to guess your bit only guesses once, and guesses optimally. Slide the detector
       mismatch above and watch Shannon barely move while min-entropy falls off a cliff.
     </p>
-    <div class="stat-grid" role="status" aria-live="polite" id="ent-stats"></div>
+    <div class="stat-grid" id="ent-stats"></div>
     <div class="chart-wrap">
       <svg viewBox="0 0 ${W} ${H}" role="img" id="ent-chart"
         aria-label="Chart of Shannon entropy and min-entropy in bits per bit, as functions of the bias P(1) from 0.5 to 1.0. The Shannon curve stays near 1 for small biases; the min-entropy line drops much faster. A marker shows the current measured bias.">
@@ -77,7 +78,8 @@ export function initEntropyPanel(root: HTMLElement): void {
         <p class="note">
           Caveat these per-bit numbers share: both assume the bits are independent. If the stream
           is also <em>correlated</em>, even min-entropy-from-bias overstates what is there — that
-          is why the box on the right switches to the measured predictor when you add correlation.
+          is why, once you add correlation, the chargeable number comes from the configured
+          model’s most-likely-path bound, with the sample predictor shown only as a diagnostic.
         </p>
       </div>
     </details>
@@ -91,9 +93,9 @@ export function initEntropyPanel(root: HTMLElement): void {
     const acc = markovPredictorAccuracy(raw)
     const hCond = acc > 0 && acc < 1 ? -Math.log2(acc) : 0
     const correlated = cfg.persistence > 0 || cfg.stuck !== null
-    // For an i.i.d. source (persistence 0) bias fully determines per-bit H∞; once
-    // correlation exists, the measured predictor is the tighter — and honest — bound.
-    const hEff = correlated ? Math.min(hMin, hCond) : hMin
+    // Two lanes: the sample statistics above are diagnostics; anything phrased as
+    // attacker work must come from the configured model, not from the sample.
+    const kModel = blockMinEntropy(BLOCK_LEN, cfg)
 
     $('#ent-stats', root).innerHTML = `
       <div class="stat"><span class="label">Measured bias P(1)</span>
@@ -106,10 +108,11 @@ export function initEntropyPanel(root: HTMLElement): void {
         <span class="note">what one optimal guess faces</span></div>
       <div class="stat"><span class="label">Attacker’s single guess succeeds</span>
         <span class="value">${pct(Math.max(p, 1 - p))}</span>
-        <span class="note">= 2^−H∞ per bit</span></div>
-      <div class="stat"><span class="label">Naive 256-bit key from raw bits</span>
-        <span class="value">${hEff === 0 ? '1 guess' : `≤ 2^${fmt(256 * hEff, 1)} work`}</span>
-        <span class="note">Shannon math would claim 2^${fmt(256 * hSh, 1)}</span></div>
+        <span class="note">= 2^−H∞ per bit, at the measured bias</span></div>
+      <div class="stat"><span class="label">Naive ${BLOCK_LEN}-bit key — model attacker work</span>
+        <span class="value">${kModel === 0 ? '1 guess' : `2^${fmt(kModel, 1)}`}</span>
+        <span class="note">exact for the configured model (most likely ${BLOCK_LEN}-bit path);
+        Shannon math would claim 2^${fmt(BLOCK_LEN * hSh, 1)}</span></div>
     `
 
     const pClamped = Math.min(0.999, Math.max(p, 1 - p))
@@ -127,13 +130,13 @@ export function initEntropyPanel(root: HTMLElement): void {
         <p class="vb-title">Chargeable (min-entropy)</p>
         <p class="vb-main">${
           correlated && hCond < hMin
-            ? `⚠ ≤ ${fmt(hCond)} bits/bit — correlation cuts it further`
-            : `${gap > 0.02 ? '⚠' : '✓'} ${fmt(hMin)} bits/bit`
+            ? `⚠ dependence detected — model rate ${fmt(kModel / BLOCK_LEN)} bits/bit`
+            : `${gap > 0.02 ? '⚠' : '✓'} ${fmt(hMin)} bits/bit at the measured bias`
         }</p>
         <p class="vb-note">${
           correlated && hCond < hMin
-            ? `A first-order predictor already guesses ${pct(acc)} of bits — bias alone no longer bounds the attacker.`
-            : `Gap to Shannon: ${fmt(gap)} bits/bit. Only this number may back a key.`
+            ? `First-order diagnostic: a predictor guesses ${pct(acc)} of this sample’s bits, so bias alone no longer describes the source; the chargeable rate comes from the model’s most-likely-path bound.`
+            : `Gap to Shannon: ${fmt(gap)} bits/bit. Only min-entropy may back a key — and for the extraction budget, only the model bound (panel 4).`
         }</p>
       </div>
     `

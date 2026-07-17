@@ -7,7 +7,7 @@ export interface SourceConfig {
   pOne: number
   /**
    * Lag-1 correlation: with probability `persistence` the next bit repeats the
-   * previous one (dead-time / afterpulsing model); otherwise a fresh Bernoulli(pOne)
+   * previous one (repeat-or-fresh Markov model); otherwise a fresh Bernoulli(pOne)
    * draw. The marginal bias stays exactly pOne for any persistence.
    */
   persistence: number

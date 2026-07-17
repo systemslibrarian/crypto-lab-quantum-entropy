@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { generateBits, makeTestRng } from './source.ts'
-import { lhlEpsilon, maxSafeOutputBits, toeplitzExtract } from './toeplitz.ts'
+import { lhlEpsilon, maxOutputBitsFor, toeplitzExtract } from './toeplitz.ts'
 
 describe('Toeplitz extraction (2-universal hashing)', () => {
   it('KAT: 4×4 matrix from seed 1011001, input 1101 → output 1110', () => {
@@ -55,8 +55,21 @@ describe('Toeplitz extraction (2-universal hashing)', () => {
     expect(lhlEpsilon(100, 200)).toBeGreaterThan(1) // m > k: bound is vacuous
   })
 
-  it('m ≤ k - 2·log₂(1/ε): you cannot extract more than you have', () => {
-    expect(maxSafeOutputBits(468, Math.pow(2, -64))).toBe(340) // 468 - 128
-    expect(maxSafeOutputBits(100, Math.pow(2, -64))).toBe(0) // not enough entropy for ANY safe bit
+  it('m ≤ k + 2 - 2·log₂(1/ε): the exact solve of the displayed bound, one convention throughout', () => {
+    expect(maxOutputBitsFor(468, Math.pow(2, -64))).toBe(342) // 468 + 2 - 128
+    expect(maxOutputBitsFor(100, Math.pow(2, -64))).toBe(0) // not enough entropy for ANY safe bit
+    // the returned m honors the target, and one more bit always violates it
+    for (const [k, eps] of [
+      [468, Math.pow(2, -64)],
+      [234.5, Math.pow(2, -32)],
+      [50.3, 0.01],
+    ] as const) {
+      const m = maxOutputBitsFor(k, eps)
+      if (m > 0) expect(lhlEpsilon(k, m)).toBeLessThanOrEqual(eps)
+      expect(lhlEpsilon(k, m + 1)).toBeGreaterThan(eps)
+    }
+    expect(() => maxOutputBitsFor(-1, 0.5)).toThrow(/≥ 0/)
+    expect(() => maxOutputBitsFor(100, 0)).toThrow(/\(0,1\)/)
+    expect(() => maxOutputBitsFor(100, 1)).toThrow(/\(0,1\)/)
   })
 })

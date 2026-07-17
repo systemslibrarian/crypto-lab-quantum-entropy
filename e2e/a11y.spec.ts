@@ -34,12 +34,14 @@ async function driveDemos(page: Page): Promise<void> {
   await page.locator('#vn-run').click()
   await page.waitForTimeout(500)
 
-  // 6. Health tests break-it: stuck detector → RCT/APT FAIL states
+  // 6. Health tests break-it: stuck detector → RCT/APT FAIL + latched gate states
   await page.locator('#ht-stick').click()
   await page.waitForTimeout(200)
 
-  // 7. Repair and restore independence so both healthy and broken states got scanned
+  // 7. Repair, recommission (unlatches the alarm), and restore independence so
+  //    healthy, broken, and recommissioned states all got scanned
   await page.locator('#ht-unstick').click()
+  await page.locator('#ht-reset').click()
   await page.locator('#vn-fix').click()
 
   // 8. Reveal all progressive-disclosure content
@@ -80,5 +82,30 @@ test('no WCAG A/AA violations — dark theme, stuck-source alarm state', async (
   await page.goto('.')
   await page.locator('#ht-stick').click()
   await page.waitForTimeout(200)
+  // the latched alarm must block the extractor (fail-closed source boundary)
+  await expect(page.locator('#tp-extract')).toBeDisabled()
   await scan(page)
 })
+
+test('health gate: repair + recommission unlatches and re-enables extraction', async ({ page }) => {
+  await page.goto('.')
+  await page.locator('#ht-stick').click()
+  await expect(page.locator('#tp-extract')).toBeDisabled()
+  // repair alone is not enough — the alarm is latched until an operator resets it
+  await page.locator('#ht-unstick').click()
+  await expect(page.locator('#tp-extract')).toBeDisabled()
+  await page.locator('#ht-reset').click()
+  await expect(page.locator('#tp-extract')).toBeEnabled()
+})
+
+for (const width of [320, 390, 768]) {
+  test(`no horizontal overflow at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 })
+    await page.goto('.')
+    await page.waitForTimeout(300)
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    )
+    expect(overflow).toBeLessThanOrEqual(0)
+  })
+}

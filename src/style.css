@@ -33,6 +33,23 @@
   color-scheme: light;
 }
 
+/* Predictable sizing inside the app and footer (the shared top bar is self-contained) */
+#app *,
+#app *::before,
+#app *::after,
+.scripture-footer * {
+  box-sizing: border-box;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #app *,
+  #app *::before,
+  #app *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
 html {
   background-color: #0f1117;
 }
@@ -151,7 +168,14 @@ body {
     flex-direction: column;
   }
   .cl-hero-why {
-    flex-basis: auto;
+    flex: none;
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+  }
+  .cl-hero-main {
+    flex: none;
+    min-width: 0;
     width: 100%;
   }
 }
@@ -526,6 +550,8 @@ body {
     align-items: stretch;
   }
   #app .field {
+    flex: none;
+    min-width: 0;
     max-width: none;
   }
 }

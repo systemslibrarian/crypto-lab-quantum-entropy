@@ -32,7 +32,7 @@ export function initVNPanel(root: HTMLElement): void {
     <p class="note" id="vn-anim-note"></p>
     <h3 id="vn-out-h">Debiased output (full stream)</h3>
     <div class="bitscroll" tabindex="0" role="region" aria-labelledby="vn-out-h" id="vn-out"></div>
-    <div class="stat-grid" role="status" aria-live="polite" id="vn-stats"></div>
+    <div class="stat-grid" id="vn-stats"></div>
     <div class="verdict-pair" role="status" aria-live="polite" id="vn-verdicts"></div>
     <div class="controls">
       <button id="vn-break">Break it: make the source streaky (80% correlation)</button>
@@ -104,9 +104,15 @@ export function initVNPanel(root: HTMLElement): void {
   $('#vn-step', root).addEventListener('click', () => step())
   $('#vn-run', root).addEventListener('click', () => {
     window.clearInterval(timer)
+    const end = Math.min(SHOWN_PAIRS, vn.steps.length)
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      cursor = end
+      renderStrip()
+      return
+    }
     timer = window.setInterval(() => {
       step()
-      if (cursor >= Math.min(SHOWN_PAIRS, vn.steps.length)) window.clearInterval(timer)
+      if (cursor >= end) window.clearInterval(timer)
     }, 140)
   })
   $('#vn-reset', root).addEventListener('click', () => {
@@ -155,18 +161,18 @@ export function initVNPanel(root: HTMLElement): void {
         <p class="vb-note">Frequency of ones in the debiased output.</p>
       </div>
       <div class="verdict-box ${stuck ? 'alarm' : predictable ? 'alarm' : 'ok'}">
-        <p class="vb-title">Security verdict — predictability</p>
+        <p class="vb-title">First-order diagnostic — dependence</p>
         <p class="vb-main">${
           stuck
             ? '✕ REJECT — source is dead'
             : predictable
-              ? `✕ REJECT — predictor guesses ${pct(acc)} of output bits`
-              : `✓ unpredictable — predictor stuck at ${pct(acc)}`
+              ? `✕ dependence detected — predictor guesses ${pct(acc)} of output bits`
+              : `✓ no first-order dependence detected in this sample (predictor at ${pct(acc)})`
         }</p>
         <p class="vb-note">${
           predictable
-            ? 'The bias check and this verdict disagree — that disagreement is the lesson: von Neumann fixes bias, not correlation.'
-            : 'First-order predictor accuracy on the actual debiased output.'
+            ? 'The bias check and this diagnostic disagree — that disagreement is the lesson: von Neumann fixes bias, not correlation.'
+            : 'One predictor finding nothing is not proof of unpredictability — it means this detector, on this sample, found nothing. Guarantees come from the model bound in panel 4.'
         }</p>
       </div>
     `

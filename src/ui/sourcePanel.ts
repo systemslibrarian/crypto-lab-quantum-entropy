@@ -10,9 +10,12 @@ export function initSourcePanel(root: HTMLElement): void {
     <h2 id="source-h">A beam-splitter QRNG — unpredictable by physics, imperfect by engineering</h2>
     <p class="lede">
       Each photon meets a half-silvered mirror and lands on detector A (bit 0) or detector B
-      (bit 1). Quantum mechanics says nobody — not even the manufacturer — can predict a single
-      outcome. But if detector B is slightly more efficient, the stream is biased; if a click
-      echoes into the next time slot, it is correlated. Set the imperfections, then emit photons.
+      (bit 1). In the ideal physics, that outcome is undetermined before detection — no
+      measurement of the device beforehand predicts it. A real device is another matter: you are
+      trusting the manufacturer’s characterization of its imperfections, and those imperfections
+      are exactly what this lab is about. If detector B is slightly more efficient, the stream is
+      biased; if a click tends to repeat into the next time slot, it is correlated. Set the
+      imperfections, then emit photons.
     </p>
     <div class="chart-wrap" style="max-width: 30rem">
       <svg viewBox="0 0 420 175" role="img" id="src-diagram"
@@ -45,20 +48,22 @@ export function initSourcePanel(root: HTMLElement): void {
         <input type="range" id="src-bias" min="50" max="70" step="1" value="53" />
       </div>
       <div class="field">
-        <label for="src-corr">Correlation (afterpulsing / dead time) = <output id="src-corr-out">0%</output></label>
+        <label for="src-corr">Correlation — P(repeat last click) = <output id="src-corr-out">0%</output></label>
         <input type="range" id="src-corr" min="0" max="90" step="5" value="0" />
       </div>
       <button id="src-generate">Emit ${STREAM_LEN.toLocaleString('en-US')} photons</button>
       <button id="src-stick" class="secondary" aria-pressed="false">Stick detector B (failure)</button>
     </div>
-    <div class="stat-grid" role="status" aria-live="polite" id="src-stats"></div>
+    <div class="stat-grid" id="src-stats"></div>
     <h3 id="src-stream-h">Raw bit stream</h3>
     <div class="bitscroll" tabindex="0" role="region" aria-labelledby="src-stream-h" id="src-stream"></div>
     <p class="model-note">
       <strong>This source is a model</strong> — those words exactly: the photons are simulated from
-      the browser CSPRNG so the imperfections are controllable. Everything downstream of the raw
-      stream — the entropy measurements, the debiaser, the extractor, the health tests — is real
-      math running on these actual bits.
+      the browser CSPRNG so the imperfections are controllable. The correlation control implements
+      a repeat-or-fresh Markov model (each bit repeats the last with the set probability, else
+      draws fresh) — a deliberately simple stand-in; real afterpulsing and dead-time physics
+      behave differently. Everything downstream of the raw stream — the entropy measurements, the
+      debiaser, the extractor, the health tests — is real math running on these actual bits.
     </p>
   `,
   )
@@ -66,14 +71,16 @@ export function initSourcePanel(root: HTMLElement): void {
   const bias = $('#src-bias', root) as HTMLInputElement
   const corr = $('#src-corr', root) as HTMLInputElement
 
+  // Label tracks the thumb live; the model commits (and the stream regenerates,
+  // with its assistive-technology announcements) once, on release.
   bias.addEventListener('input', () => {
     $('#src-bias-out', root).textContent = `${bias.value}%`
-    setConfig({ pOne: Number(bias.value) / 100 })
   })
+  bias.addEventListener('change', () => setConfig({ pOne: Number(bias.value) / 100 }))
   corr.addEventListener('input', () => {
     $('#src-corr-out', root).textContent = `${corr.value}%`
-    setConfig({ persistence: Number(corr.value) / 100 })
   })
+  corr.addEventListener('change', () => setConfig({ persistence: Number(corr.value) / 100 }))
   $('#src-generate', root).addEventListener('click', () => regenerate())
   const stickBtn = $('#src-stick', root)
   stickBtn.addEventListener('click', () => {
