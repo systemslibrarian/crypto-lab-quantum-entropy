@@ -52,8 +52,8 @@ export function initEntropyPanel(root: HTMLElement): void {
         <text x="${(PAD.l + W - PAD.r) / 2}" y="${H - 1}" text-anchor="middle">bias P(1)</text>
         <path d="${curvePath(shannonEntropy)}" fill="none" stroke="var(--ok-ink)" stroke-width="2.5"/>
         <path d="${curvePath(minEntropy)}" fill="none" stroke="var(--danger-ink)" stroke-width="2.5"/>
-        <text x="${px(0.84)}" y="${py(shannonEntropy(0.84)) - 8}" fill="var(--ok-ink)">Shannon H</text>
-        <text x="${px(0.62)}" y="${py(minEntropy(0.62)) + 20}" fill="var(--danger-ink)">min-entropy H∞</text>
+        <text x="${px(0.84)}" y="${py(shannonEntropy(0.84)) - 8}" style="fill: var(--ok-ink); font-weight: 700">Shannon H</text>
+        <text x="${px(0.62)}" y="${py(minEntropy(0.62)) + 20}" style="fill: var(--danger-ink); font-weight: 700">min-entropy H∞</text>
         <g id="ent-marker">
           <line x1="0" y1="${PAD.t}" x2="0" y2="${py(0)}" stroke="var(--accent-ink)" stroke-dasharray="4 3"/>
         </g>
@@ -91,6 +91,9 @@ export function initEntropyPanel(root: HTMLElement): void {
     const acc = markovPredictorAccuracy(raw)
     const hCond = acc > 0 && acc < 1 ? -Math.log2(acc) : 0
     const correlated = cfg.persistence > 0 || cfg.stuck !== null
+    // For an i.i.d. source (persistence 0) bias fully determines per-bit H∞; once
+    // correlation exists, the measured predictor is the tighter — and honest — bound.
+    const hEff = correlated ? Math.min(hMin, hCond) : hMin
 
     $('#ent-stats', root).innerHTML = `
       <div class="stat"><span class="label">Measured bias P(1)</span>
@@ -104,6 +107,9 @@ export function initEntropyPanel(root: HTMLElement): void {
       <div class="stat"><span class="label">Attacker’s single guess succeeds</span>
         <span class="value">${pct(Math.max(p, 1 - p))}</span>
         <span class="note">= 2^−H∞ per bit</span></div>
+      <div class="stat"><span class="label">Naive 256-bit key from raw bits</span>
+        <span class="value">${hEff === 0 ? '1 guess' : `≤ 2^${fmt(256 * hEff, 1)} work`}</span>
+        <span class="note">Shannon math would claim 2^${fmt(256 * hSh, 1)}</span></div>
     `
 
     const pClamped = Math.min(0.999, Math.max(p, 1 - p))

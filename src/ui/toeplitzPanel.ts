@@ -31,6 +31,15 @@ export function initToeplitzPanel(root: HTMLElement): void {
       <button id="tp-extract">Draw fresh seed &amp; extract</button>
     </div>
     <div class="stat-grid" role="status" aria-live="polite" id="tp-stats"></div>
+    <h3>The entropy budget</h3>
+    <div class="chart-wrap">
+      <svg viewBox="0 0 440 84" role="img" id="tp-budget" aria-label=""></svg>
+      <p class="note" style="margin: 0.3rem 0 0">
+        The ledger the lemma enforces: of ${N} raw bits, only k carry min-entropy, and every output
+        bit is drawn against k — never against ${N}. Demand past the shaded funds and you are
+        withdrawing uniformity that was never deposited.
+      </p>
+    </div>
     <div class="verdict-pair" role="status" aria-live="polite" id="tp-verdicts"></div>
     <h3 id="tp-out-h">Extracted output</h3>
     <div class="bitscroll" tabindex="0" role="region" aria-labelledby="tp-out-h" id="tp-output">
@@ -78,9 +87,12 @@ export function initToeplitzPanel(root: HTMLElement): void {
     if (input.length < N) return { k: 0, basis: 'no stream yet' }
     const p = fractionOnes(raw)
     const hBias = minEntropy(p)
+    // The measured predictor bound only applies when correlation actually exists —
+    // on an i.i.d. stream it would nose below the bias bound by pure overfitting.
+    const correlated = state.cfg.persistence > 0
     const acc = markovPredictorAccuracy(raw)
     const hPred = acc > 0 && acc < 1 ? -Math.log2(acc) : 0
-    const h = Math.min(hBias, hPred)
+    const h = correlated ? Math.min(hBias, hPred) : hBias
     return {
       k: N * h,
       basis:
@@ -109,12 +121,14 @@ export function initToeplitzPanel(root: HTMLElement): void {
         <span class="value">${eps >= 1 ? '≥ 1 (vacuous)' : sci(eps)}</span></div>
     `
 
+    renderBudget(m, k)
+
     const ranNote = last
       ? `${lastM} bits produced — the GF(2) multiply always runs fine.`
       : 'Not extracted yet.'
     const level = eps <= Math.pow(2, -32) ? 'ok' : eps <= Math.pow(2, -10) ? 'warn' : 'alarm'
     $('#tp-verdicts', root).innerHTML = `
-      <div class="verdict-box ${last ? 'neutral' : 'neutral'}">
+      <div class="verdict-box neutral">
         <p class="vb-title">Extractor result (the math)</p>
         <p class="vb-main">${last ? `${lastM} bits output ✓` : '—'}</p>
         <p class="vb-note">${ranNote} Producing output is not evidence of security.</p>
@@ -134,6 +148,38 @@ export function initToeplitzPanel(root: HTMLElement): void {
             : `ε bounds every distinguisher’s advantage. Margin of ${fmt(margin, 1)} bits ⇒ ε ≤ ½·2^−${fmt(margin / 2, 1)}.`
         }</p>
       </div>
+    `
+  }
+
+  function renderBudget(m: number, k: number): void {
+    const svg = $('#tp-budget', root)
+    const X0 = 10
+    const SCALE = 420 / N
+    const x = (bits: number) => X0 + bits * SCALE
+    const overdraft = m > k
+    svg.setAttribute(
+      'aria-label',
+      `Entropy budget bar: of ${N} raw bits, k = ${k.toFixed(1)} bits of min-entropy are available. ` +
+        (overdraft
+          ? `You demanded m = ${m} bits — an overdraft of ${(m - k).toFixed(1)} bits past the available entropy.`
+          : `You demanded m = ${m} bits, leaving a security margin of ${(k - m).toFixed(1)} bits.`),
+    )
+    svg.innerHTML = `
+      <rect x="${X0}" y="34" width="${420}" height="18" rx="4" fill="none" stroke="var(--border)"/>
+      <rect x="${X0}" y="34" width="${Math.max(0, k * SCALE)}" height="18" rx="4"
+        fill="color-mix(in oklab, var(--accent) 45%, transparent)"/>
+      ${
+        overdraft
+          ? `<rect x="${x(k)}" y="34" width="${(m - k) * SCALE}" height="18"
+               fill="color-mix(in oklab, #dc2626 55%, transparent)"/>
+             <text x="${Math.min(x((k + m) / 2), 380)}" y="80" text-anchor="middle"
+               style="fill: var(--danger-ink); font-weight: 700">overdraft ${(m - k).toFixed(1)} bits</text>`
+          : `<text x="${x((m + k) / 2)}" y="80" text-anchor="middle">margin ${(k - m).toFixed(1)} bits</text>`
+      }
+      <line x1="${x(m)}" y1="26" x2="${x(m)}" y2="60" stroke="var(--text)" stroke-width="2"/>
+      <text x="${Math.min(Math.max(x(m), 30), 400)}" y="20" text-anchor="middle" style="fill: var(--text); font-weight: 700">m = ${m}</text>
+      <text x="${Math.min(Math.max(x(k), 40), 390)}" y="66" text-anchor="${k > N * 0.85 ? 'end' : 'middle'}"
+        style="fill: var(--accent-ink); font-weight: 700">k = ${k.toFixed(1)}</text>
     `
   }
 

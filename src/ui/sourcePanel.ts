@@ -14,6 +14,31 @@ export function initSourcePanel(root: HTMLElement): void {
       outcome. But if detector B is slightly more efficient, the stream is biased; if a click
       echoes into the next time slot, it is correlated. Set the imperfections, then emit photons.
     </p>
+    <div class="chart-wrap" style="max-width: 30rem">
+      <svg viewBox="0 0 420 175" role="img" id="src-diagram"
+        aria-label="Beam-splitter diagram: a photon source fires at a half-silvered mirror; transmitted photons reach detector A and record a 0, reflected photons reach detector B and record a 1. The percentage of clicks at each detector is shown next to it and updates with the stream.">
+        <rect x="8" y="78" width="78" height="30" rx="6" fill="none" stroke="var(--border)"/>
+        <text x="47" y="97" text-anchor="middle" style="fill: var(--text)">photon</text>
+        <line x1="86" y1="93" x2="196" y2="93" stroke="var(--accent-ink)" stroke-dasharray="5 4" stroke-width="2"/>
+        <line x1="188" y1="110" x2="222" y2="76" stroke="var(--text-dim)" stroke-width="3"/>
+        <text x="205" y="132" text-anchor="middle">half-silvered</text>
+        <text x="205" y="146" text-anchor="middle">mirror</text>
+        <line x1="212" y1="93" x2="322" y2="93" stroke="var(--accent-ink)" stroke-width="2"/>
+        <polygon points="322,88 332,93 322,98" fill="var(--accent-ink)"/>
+        <line x1="205" y1="86" x2="205" y2="40" stroke="var(--accent-ink)" stroke-width="2"/>
+        <polygon points="200,40 205,30 210,40" fill="var(--accent-ink)"/>
+        <rect x="334" y="76" width="78" height="34" rx="6" fill="none" stroke="var(--ok-ink)" stroke-width="1.5"/>
+        <text x="373" y="90" text-anchor="middle" style="fill: var(--text); font-weight: 700">A → 0</text>
+        <text x="373" y="104" text-anchor="middle" id="src-diag-a">—</text>
+        <rect x="166" y="4" width="78" height="24" rx="6" fill="none" stroke="var(--warn-ink)" stroke-width="1.5"/>
+        <text x="205" y="20" text-anchor="middle" style="fill: var(--text); font-weight: 700">B → 1</text>
+        <text x="255" y="20" id="src-diag-b" text-anchor="start">—</text>
+      </svg>
+      <p class="note" style="margin: 0.3rem 0 0">
+        In theory each photon takes either path with probability ½ — genuinely undecided until
+        detection. The percentages show where this device's clicks actually landed.
+      </p>
+    </div>
     <div class="controls">
       <div class="field">
         <label for="src-bias">Detector mismatch — P(detector B) = <output id="src-bias-out">53%</output></label>
@@ -72,5 +97,8 @@ export function initSourcePanel(root: HTMLElement): void {
         <span class="note">${cfg.stuck !== null ? 'detector stuck — constant output' : `set point ${pct(cfg.pOne, 0)}`}</span></div>
     `
     $('#src-stream', root).textContent = bitsToText(raw)
+    $('#src-diag-a', root).textContent = cfg.stuck === 1 ? '0% — silent' : pct(1 - ones)
+    $('#src-diag-b', root).textContent =
+      cfg.stuck === 1 ? '100% — stuck!' : cfg.stuck === 0 ? '0% — silent' : pct(ones)
   })
 }
