@@ -1,0 +1,23 @@
+NEW DEMO BRIEF
+- Repo name:         crypto-lab-quantum-entropy
+- Short name (H1):   Quantum Entropy
+- Subtitle:          QRNG · min-entropy · randomness extraction
+- One-liner:         A biased quantum source producing real randomness, and the extractor that turns a stream nobody can predict into a stream nobody can distinguish.
+- Concept to teach:  A quantum source is unpredictable by physics, not by assumption — and it is still not usable as a key. Raw quantum output is biased, correlated, and partially known to whoever built the hardware. Min-entropy measures what's actually there; an extractor converts it into uniform bits. The gap between "unpredictable" and "uniform" is where QRNG marketing lives and where the real engineering happens.
+- Primitives/spec:   Quantum randomness sources (beam splitter, vacuum fluctuation, photon arrival timing), Shannon entropy vs min-entropy (H∞ = -log₂ max p), von Neumann debiasing, Toeplitz-matrix randomness extraction (2-universal hashing), the Leftover Hash Lemma, NIST SP 800-90B health tests (RCT and APT), entropy source vs conditioning vs DRBG (SP 800-90C)
+- Accent (--accent): #4338CA
+- Favicon emoji:     ⚛️
+- In scope:
+    * The source panel: a modeled beam-splitter QRNG with a learner-controlled bias slider. Photon hits detector A or B — 50/50 in theory, 53/47 in a real device with mismatched detectors. Generate the raw stream. Label the model as a model in those words; the extraction math downstream is real.
+    * MIN-ENTROPY vs SHANNON — the first headline, and the conceptual payoff. Same biased stream, two measurements:
+        Shannon H  = 0.9974 bits/bit    ← "99.7% random!" — the marketing number
+        Min-entropy H∞ = 0.9159 bits/bit ← what an attacker who guesses optimally actually faces
+      Compute both live off the same stream. Slide the bias and watch Shannon barely move while min-entropy falls off a cliff. State why: Shannon averages over all outcomes; min-entropy is the single most likely one, and the attacker only guesses once. This distinction is the lab.
+    * VON NEUMANN DEBIASING — the second headline, animated:
+        pairs:  01 → 0     10 → 1     00 → discard     11 → discard
+      Real bits, real discards. Show the output becoming perfectly unbiased and the throughput collapsing to ~p(1-p) of input. Then the honest limit: von Neumann fixes bias, NOT correlation. Feed it a correlated stream and watch it output biased garbage while claiming success. Learner causes it.
+    * TOEPLITZ EXTRACTION — the real tool. A 2-universal hash from a Toeplitz matrix, real GF(2) matrix-vector multiply, live. Input n bits with min-entropy k, output m ≤ k - 2log(1/ε) uniform bits. Show the Leftover Hash Lemma's accounting: you cannot extract more than you have, the extractor needs its own seed, and the output length is a security parameter not a throughput choice. Let the learner set m too high and watch the security margin evaporate.
+    * Health tests: SP 800-90B's Repetition Count Test and Adaptive Proportion Test, running live. Break the source (stick a detector) and watch RCT fire. This is what a real QRNG does continuously, because a dead source outputs a beautiful constant.
+    * The architecture panel — where this sits: entropy source → health tests → conditioning/extraction → DRBG seed → DRBG. Link drbg-arena (what happens after the seed), entropy-collapse (what happens when the seed is shared), corrupted-oracle (what happens when the DRBG is rigged), bb84 and e91 (quantum measurement, but for key agreement rather than generation).
+    * Honest scoping: device-independent randomness (Bell-test-certified, link e91's CHSH) is the only construction that doesn't require trusting the manufacturer. Name it, note it's slow and rare, don't build it.
+- Non-goals:         Not a QKD lab (link bb84, e91). Not a DRBG lab (link drbg-arena). Not an entropy-failure lab (link entropy-collapse — that's a shared seed, this is a weak one). No real quantum hardware. No device-independent RNG build-out. No SP 800-22 statistical suite (drbg-arena owns it) — and note that a von-Neumann-debiased correlated stream passes plenty of statistical tests while being predictable.
