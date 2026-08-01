@@ -29,7 +29,7 @@ export function initEntropyPanel(root: HTMLElement): void {
     root,
     `
     <p class="kicker">2 · Headline — the two numbers</p>
-    <h2 id="entropy-h">Shannon says “99.7% random.” Min-entropy says otherwise.</h2>
+    <h2 id="entropy-h">Shannon says “<span id="ent-headline-shannon">99.7%</span> random.” Min-entropy says otherwise.</h2>
     <p class="lede">
       Both measurements below run live on the same raw stream. Shannon entropy is the
       <em>average</em> surprise across all outcomes — the number that ends up in marketing.
@@ -96,6 +96,12 @@ export function initEntropyPanel(root: HTMLElement): void {
     // Two lanes: the sample statistics above are diagnostics; anything phrased as
     // attacker work must come from the configured model, not from the sample.
     const kModel = blockMinEntropy(BLOCK_LEN, cfg)
+
+    // The headline quotes the live Shannon figure, not the default device's. A hardcoded
+    // "99.7%" was true only at 53/47; drag the bias to 70% and the heading contradicted the
+    // statistic printed directly beneath it. This panel's entire argument is that a number
+    // can be true and still mislead — it cannot afford a number that is simply stale.
+    $('#ent-headline-shannon', root).textContent = pct(hSh)
 
     $('#ent-stats', root).innerHTML = `
       <div class="stat"><span class="label">Measured bias P(1)</span>
