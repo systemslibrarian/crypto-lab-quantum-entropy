@@ -111,7 +111,6 @@ body {
   max-width: 72ch;
 }
 
-/* BEGIN cl-hero standard — managed, keep in sync across fleet */
 .cl-hero {
   display: flex;
   align-items: flex-start;
@@ -179,7 +178,6 @@ body {
     width: 100%;
   }
 }
-/* END cl-hero standard */
 
 /* ===== Controls ===== */
 #app button {
@@ -191,6 +189,11 @@ body {
   border-radius: 8px;
   padding: 0.45rem 0.95rem;
   cursor: pointer;
+  /* WCAG 2.5.5 target size */
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 #app button:hover {
   filter: brightness(1.12);
