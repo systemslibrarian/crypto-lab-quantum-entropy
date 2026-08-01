@@ -1,6 +1,6 @@
 # Quantum Entropy — crypto-lab
 
-**QRNG · min-entropy · randomness extraction.** A biased quantum source producing real randomness, and the extractor that turns a stream nobody can predict into a stream nobody can distinguish.
+**QRNG · min-entropy · randomness extraction.** A *modeled* biased beam-splitter QRNG — the bits come from the browser CSPRNG, not from photons — feeding the real entropy accounting and the real extractor that turn a stream nobody can predict into a stream nobody can distinguish.
 
 ## What It Is
 
