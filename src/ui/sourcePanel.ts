@@ -82,15 +82,31 @@ export function initSourcePanel(root: HTMLElement): void {
   })
   corr.addEventListener('change', () => setConfig({ persistence: Number(corr.value) / 100 }))
   $('#src-generate', root).addEventListener('click', () => regenerate())
+  // The toggle is rendered FROM state, never from a local copy of it: panel 5's
+  // "Break it: stick detector B" / "Repair the source" buttons drive the same
+  // cfg.stuck. Tracking it here instead left this button labelled "Stick
+  // detector B (failure)" with aria-pressed="false" over an already-stuck
+  // source — and its next click un-stuck the detector it offered to stick.
   const stickBtn = $('#src-stick', root)
-  stickBtn.addEventListener('click', () => {
-    const nowStuck = state.cfg.stuck === null ? 1 : null
-    stickBtn.setAttribute('aria-pressed', String(nowStuck !== null))
-    stickBtn.textContent = nowStuck !== null ? 'Un-stick detector B' : 'Stick detector B (failure)'
-    setConfig({ stuck: nowStuck })
-  })
+  stickBtn.addEventListener('click', () => setConfig({ stuck: state.cfg.stuck === null ? 1 : null }))
 
   subscribe(({ cfg, raw }) => {
+    stickBtn.setAttribute('aria-pressed', String(cfg.stuck !== null))
+    stickBtn.textContent =
+      cfg.stuck !== null ? 'Un-stick detector B' : 'Stick detector B (failure)'
+
+    // Panel 3's "Break it: make the source streaky" / "Restore independent
+    // source" buttons set cfg.persistence, so these controls have to be
+    // rendered from the config too. Left tracking only their own events, the
+    // correlation slider read "P(repeat last click) = 0%" while the source ran
+    // at 80% and every other panel reported the dependence.
+    const biasPct = Math.round(cfg.pOne * 100)
+    const corrPct = Math.round(cfg.persistence * 100)
+    bias.value = String(biasPct)
+    $('#src-bias-out', root).textContent = `${biasPct}%`
+    corr.value = String(corrPct)
+    $('#src-corr-out', root).textContent = `${corrPct}%`
+
     const ones = fractionOnes(raw)
     $('#src-stats', root).innerHTML = `
       <div class="stat"><span class="label">Photons emitted</span>

@@ -93,6 +93,12 @@ export function initEntropyPanel(root: HTMLElement): void {
     const acc = markovPredictorAccuracy(raw)
     const hCond = acc > 0 && acc < 1 ? -Math.log2(acc) : 0
     const correlated = cfg.persistence > 0 || cfg.stuck !== null
+    // A dead source lands at hCond = hMin = exactly 0 (predictor accuracy 1,
+    // bias 1), and the gap test below reads "no gap" there for the same reason
+    // it does at p = 0.5: H − H∞ vanishes at BOTH ends of the scale. Ties must
+    // take the dependence branch, or a stuck detector gets stamped
+    // "✓ 0.0000 bits/bit" by the same panel that prints "1 guess" beside it.
+    const dependenceRules = correlated && hCond <= hMin
     // Two lanes: the sample statistics above are diagnostics; anything phrased as
     // attacker work must come from the configured model, not from the sample.
     const kModel = blockMinEntropy(BLOCK_LEN, cfg)
@@ -135,12 +141,12 @@ export function initEntropyPanel(root: HTMLElement): void {
       <div class="verdict-box ${gap > 0.02 || correlated ? 'warn' : 'ok'}">
         <p class="vb-title">Chargeable (min-entropy)</p>
         <p class="vb-main">${
-          correlated && hCond < hMin
+          dependenceRules
             ? `⚠ dependence detected — model rate ${fmt(kModel / BLOCK_LEN)} bits/bit`
             : `${gap > 0.02 ? '⚠' : '✓'} ${fmt(hMin)} bits/bit at the measured bias`
         }</p>
         <p class="vb-note">${
-          correlated && hCond < hMin
+          dependenceRules
             ? `First-order diagnostic: a predictor guesses ${pct(acc)} of this sample’s bits, so bias alone no longer describes the source; the chargeable rate comes from the model’s most-likely-path bound.`
             : `Gap to Shannon: ${fmt(gap)} bits/bit. Only min-entropy may back a key — and for the extraction budget, only the model bound (panel 4).`
         }</p>
