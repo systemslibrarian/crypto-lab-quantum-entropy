@@ -1,10 +1,24 @@
 /* ===== Theme contract: dark default, light under [data-theme="light"] ===== */
+/* --accent is the FILL of every primary button, and a filled control is found
+   by its fill (WCAG 1.4.11, 3:1). At #4338ca it measured 2.20:1 against the
+   --panel surface every button sits on, so no button in the lab had a
+   perceivable boundary in the dark theme. Lightened until the fill clears 3:1
+   while --btn-ink (#fff) on top still clears 4.5:1 — a window only about
+   L* 0.13–0.18 wide, measured at both ends. Both themes carry the same value,
+   because the shared top bar is always dark and derives its brand ink and its
+   button edge from whatever --accent the lab declares.
+   --control-border is a CONTROL boundary and --border is a SURFACE divider;
+   they are deliberately different tokens. --border is right for the panel,
+   stat, chip, verdict-box and bitscroll edges, which are decorative separators
+   1.4.11 exempts, and wrong for a .secondary button, whose border is the only
+   thing that exists (1.45:1 dark / 1.60:1 light before this). */
 :root {
-  --accent: #4338ca;
+  --accent: #6154dc;
   --bg: #0f1117;
   --panel: #171a23;
   --panel-2: #1d212d;
   --border: #303648;
+  --control-border: #7b8296;
   --text: #e8eaf2;
   --text-dim: #a9aec0;
   --accent-ink: #a5b4fc;
@@ -12,16 +26,24 @@
   --warn-ink: #f5c451;
   --danger-ink: #ff8f8f;
   --btn-ink: #ffffff;
-  --chart-grid: #303648;
+  /* Chart geometry — the axes of the entropy chart and the outline of the
+     photon-source box in the beam-splitter diagram. Those lines ARE the figure
+     (WCAG 1.4.11, 3:1 for graphical objects required to understand the
+     content), and the dashed one at H = 1.0 is the reference the whole "Shannon
+     barely moves" reading is made against. This token used to hold the same
+     value as --border, a surface divider, and measured 1.34:1 against the
+     chart's --panel-2 surface. */
+  --chart-grid: #6b7488;
   color-scheme: dark;
 }
 
 :root[data-theme='light'] {
-  --accent: #4338ca;
+  --accent: #6154dc;
   --bg: #f4f4f9;
   --panel: #ffffff;
   --panel-2: #eef0f7;
   --border: #c8ccda;
+  --control-border: #6a7285;
   --text: #191b24;
   --text-dim: #494f63;
   --accent-ink: #3730a3;
@@ -29,7 +51,8 @@
   --warn-ink: #854d0e;
   --danger-ink: #b91c1c;
   --btn-ink: #ffffff;
-  --chart-grid: #d4d7e4;
+  /* 3.44:1 on the light --panel-2 (was --border #d4d7e4, 1.26:1). */
+  --chart-grid: #7c8194;
   color-scheme: light;
 }
 
@@ -198,10 +221,14 @@ body {
 #app button:hover {
   filter: brightness(1.12);
 }
+/* A .secondary button paints no fill at all, so its border is not a decoration
+   on top of a boundary — it IS the boundary, and the only thing that says a
+   control is there. It drew in --border, the surface divider: 1.45:1 dark,
+   1.60:1 light. */
 #app button.secondary {
   background: transparent;
   color: var(--accent-ink);
-  border-color: var(--border);
+  border-color: var(--control-border);
 }
 #app button[aria-pressed='true'] {
   background: var(--panel-2);

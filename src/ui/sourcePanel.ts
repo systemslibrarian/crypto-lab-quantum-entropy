@@ -20,7 +20,12 @@ export function initSourcePanel(root: HTMLElement): void {
     <div class="chart-wrap" style="max-width: 30rem">
       <svg viewBox="0 0 420 175" role="img" id="src-diagram"
         aria-label="Beam-splitter diagram: a photon source fires at a half-silvered mirror; transmitted photons reach detector A and record a 0, reflected photons reach detector B and record a 1. The percentage of clicks at each detector is shown next to it and updates with the stream.">
-        <rect x="8" y="78" width="78" height="30" rx="6" fill="none" stroke="var(--border)"/>
+        <!-- fill="none", so the stroke IS the box. --border is a SURFACE divider
+             and measured 1.34:1 dark / 1.41:1 light against the panel behind
+             this figure, while the two detector boxes beside it (--ok-ink,
+             --warn-ink) were at 6.0:1 to 9.9:1 — the same shape, one hue left
+             out. --chart-grid is the diagram-geometry token. -->
+        <rect x="8" y="78" width="78" height="30" rx="6" fill="none" stroke="var(--chart-grid)"/>
         <text x="47" y="97" text-anchor="middle" style="fill: var(--text)">photon</text>
         <line x1="86" y1="93" x2="196" y2="93" stroke="var(--accent-ink)" stroke-dasharray="5 4" stroke-width="2"/>
         <line x1="188" y1="110" x2="222" y2="76" stroke="var(--text-dim)" stroke-width="3"/>

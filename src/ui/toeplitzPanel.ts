@@ -171,14 +171,39 @@ export function initToeplitzPanel(root: HTMLElement): void {
           ? `You demanded m = ${m} bits — an overdraft of ${(m - k).toFixed(1)} bits past the available entropy.`
           : `You demanded m = ${m} bits, leaving a security margin of ${(k - m).toFixed(1)} bits.`),
     )
+    // The two bands ARE this figure, and the caption points straight at them
+    // ("Demand past the shaded funds"), so WCAG 1.4.11's 3:1 for graphical
+    // objects applies to both. They were translucent `color-mix(…, transparent)`
+    // and measured 1.57:1 (available) and 1.75:1 (overdraft) against the chart
+    // surface — and, worse, 1.12:1 AGAINST EACH OTHER, which is the one
+    // distinction the whole exhibit exists to draw.
+    //
+    // Both are now opaque theme inks: 8.07:1 and 7.34:1 against the surface in
+    // the dark theme, 8.71:1 and 5.70:1 in light. That still leaves them only
+    // 1.10:1 apart, and no palette can fix that: on a near-black surface, two
+    // bands that each clear 3:1 against it AND 3:1 against each other must sit
+    // at L* 0.15 and L* 0.54, which would paint the overdraft PALER than the
+    // available funds and invert the semantics. So the overdraft is drawn as a
+    // 45-degree HATCH rather than a solid — a non-colour distinction, with the
+    // surface showing through the gaps at 8.07:1 from the solid band beside it.
+    //
+    // The overdraft fill was also a hardcoded `#dc2626` inside a themed figure,
+    // so it did not move with the light theme at all.
     svg.innerHTML = `
-      <rect x="${X0}" y="34" width="${420}" height="18" rx="4" fill="none" stroke="var(--border)"/>
+      <defs>
+        <pattern id="tp-overdraft-hatch" width="8" height="8"
+                 patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+          <rect width="8" height="8" fill="var(--panel-2)"/>
+          <rect width="4" height="8" fill="var(--danger-ink)"/>
+        </pattern>
+      </defs>
+      <rect x="${X0}" y="34" width="${420}" height="18" rx="4" fill="none" stroke="var(--chart-grid)"/>
       <rect x="${X0}" y="34" width="${Math.max(0, k * SCALE)}" height="18" rx="4"
-        fill="color-mix(in oklab, var(--accent) 45%, transparent)"/>
+        fill="var(--accent-ink)"/>
       ${
         overdraft
           ? `<rect x="${x(k)}" y="34" width="${(m - k) * SCALE}" height="18"
-               fill="color-mix(in oklab, #dc2626 55%, transparent)"/>
+               fill="url(#tp-overdraft-hatch)"/>
              <text x="${Math.min(x((k + m) / 2), 380)}" y="80" text-anchor="middle"
                style="fill: var(--danger-ink); font-weight: 700">overdraft ${(m - k).toFixed(1)} bits</text>`
           : `<text x="${x((m + k) / 2)}" y="80" text-anchor="middle">margin ${(k - m).toFixed(1)} bits</text>`

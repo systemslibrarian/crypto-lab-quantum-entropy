@@ -19,9 +19,15 @@ export function initVNPanel(root: HTMLElement): void {
       through real pairs from the stream above, then make the source streaky and see what the
       debiaser misses.
     </p>
-    <div class="vn-rule" aria-label="Von Neumann rule">
-      <span>01 → <strong>0</strong></span><span>10 → <strong>1</strong></span>
-      <span>00 → ✕ discard</span><span>11 → ✕ discard</span>
+    <!-- role="list" is not decoration. An aria-label on a role-less <div> is
+         PROHIBITED by ARIA and silently discarded, so the name "Von Neumann
+         rule" reached no assistive technology at all — and axe files that under
+         "incomplete", never "violations", which is why a violations-only gate
+         never saw it. These four spans are a list of the four pair rules, the
+         same shape .vn-strip below already uses. -->
+    <div class="vn-rule" role="list" aria-label="Von Neumann pair rules">
+      <span role="listitem">01 → <strong>0</strong></span><span role="listitem">10 → <strong>1</strong></span>
+      <span role="listitem">00 → ✕ discard</span><span role="listitem">11 → ✕ discard</span>
     </div>
     <div class="controls">
       <button id="vn-step">Step one pair</button>
