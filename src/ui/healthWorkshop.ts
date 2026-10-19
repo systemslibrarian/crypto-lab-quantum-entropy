@@ -14,8 +14,8 @@ export function initHealthWorkshop(root: HTMLElement): void {
         <option value="stuck">Detector sticks at 1</option>
         <option value="alternating">Predictable 010101… (balanced, no long runs)</option></select></label>
       <label>APT window <select id="hw-window"><option>128</option><option>512</option><option selected>1024</option><option>2048</option></select></label>
-      <label>APT alarm count <input id="hw-cutoff" type="number" min="2" max="1025" step="1"></label>
-      <label>RCT alarm run <input id="hw-rct" type="number" min="2" max="128" step="1"></label>
+      <label>APT alarm count <input id="hw-cutoff" type="number" min="2" max="1025" step="1" required></label>
+      <label>RCT alarm run <input id="hw-rct" type="number" min="2" max="128" step="1" required></label>
     </div>
     <div class="controls"><button id="hw-run">Test this setting</button>
       <button id="hw-preset" class="secondary">Restore formula cutoffs</button></div>

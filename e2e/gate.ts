@@ -33,7 +33,7 @@ export const NARROW = { width: 380, height: 800 }
  *     `waitForTimeout(500)` — which is not a completion signal, just a guess.
  *
  *  2. IT FORCE-REVEALED EVERY DISCLOSURE. Its last step set `open = true` on
- *     every `<details>` from script. This gate never touches `open`; all four
+ *     every `<details>` from script. This gate never touches `open`; all five
  *     disclosures are opened by clicking their own `<summary>`, which is also
  *     the only way to find out whether the summary is reachable and operable.
  *
@@ -217,8 +217,8 @@ export async function boot(page: Page, theme: 'dark' | 'light'): Promise<void> {
 
   // Every panel body is written by `src/ui/*.ts` into an empty `<section>`, so a
   // navigation that resolves proves nothing about what is on screen.
-  await expect(page.locator('#app section.panel')).toHaveCount(7)
-  for (const id of ['source-h', 'entropy-h', 'vn-h', 'toeplitz-h', 'health-h']) {
+  await expect(page.locator('#app section.panel')).toHaveCount(8)
+  for (const id of ['source-h', 'entropy-h', 'vn-h', 'toeplitz-h', 'health-h', 'workshop-h']) {
     await expect(page.locator(`#${id}`)).toBeVisible()
   }
 
@@ -245,9 +245,9 @@ export async function boot(page: Page, theme: 'dark' | 'light'): Promise<void> {
   await expect(page.locator('#ht-reset-note')).toBeEmpty()
   await expect(page.locator('#ht-verdicts .verdict-box.alarm')).toHaveCount(0)
 
-  // Four inline disclosures, all shut. `driveDemos()` used to open them from
+  // Five inline disclosures, all shut. `driveDemos()` used to open them from
   // script; here they are only ever opened by clicking their summary.
-  await expect(page.locator('#app details')).toHaveCount(4)
+  await expect(page.locator('#app details')).toHaveCount(5)
   await expect(page.locator('#app details[open]')).toHaveCount(0)
 
   await settle(page)
@@ -902,8 +902,8 @@ export async function driveAllStates(page: Page, theme: string): Promise<void> {
   await scanAt('recommissioned — alarm cleared and extraction re-enabled')
 
   // ── Every disclosure, opened through its own summary ──────────────────────
-  for (let i = 0; i < 4; i += 1) {
+  for (let i = 0; i < 5; i += 1) {
     await openDisclosure(page, i)
-    await scanAt(`disclosure ${i + 1} of 4 opened`)
+    await scanAt(`disclosure ${i + 1} of 5 opened`)
   }
 }
