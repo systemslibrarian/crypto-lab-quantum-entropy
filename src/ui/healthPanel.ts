@@ -32,7 +32,7 @@ export function initHealthPanel(root: HTMLElement): void {
           device is commissioned: RCT fires at a run of C = 1 + ⌈20/H⌉ identical samples, and APT
           fires when the first sample of a ${APT_WINDOW}-sample window recurs
           1 + critbinom(${APT_WINDOW}, 2⁻ᴴ, 1−2⁻²⁰) times, so an ideal source AT the claim
-          false-alarms about once per 2²⁰ evaluations. Claiming more entropy than the device has
+          uses a nominal tail target of 2⁻²⁰. The actual false-alarm probability depends on the distribution and test evaluation; the workshop below computes it for an IID binary model. Claiming more entropy than the device has
           makes alarms common — which is a feature: the original version of this lab claimed
           H = 1 for a 53/47 device, and its APT would have false-alarmed roughly a thousand times
           too often. Changing cutoffs is a commissioning action performed by an operator; a
@@ -40,7 +40,7 @@ export function initHealthPanel(root: HTMLElement): void {
         </p>
         <p class="note">
           Neither test certifies entropy: a stream can pass both while being 100% predictable to
-          its manufacturer (a keyed PRNG passes every output-facing test there is). Passing means
+          its manufacturer (statistical tests cannot establish that its seed is unknown). Passing means
           “not obviously dead,” never “random.” The extraction budget comes from the model bound
           in panels 2 and 4 — the tests only guard against the source dying later.
         </p>

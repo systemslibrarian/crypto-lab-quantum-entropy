@@ -25,7 +25,7 @@ import {
  * bar's overdraft rectangle; detector B stuck so both health tests fail and the
  * alarm latches the extractor shut; recommissioning REFUSED while the source is
  * still dead; the source repaired but still latched; the recommission that
- * clears it; and each of the four disclosures opened by clicking its summary.
+ * clears it; and each of the five disclosures opened by clicking its summary.
  * Every one of those states is scanned, in both themes, at desktop and phone
  * width.
  *

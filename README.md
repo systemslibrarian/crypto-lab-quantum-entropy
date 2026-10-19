@@ -43,7 +43,7 @@ Emit photons from an imperfect device, watch the two entropy numbers diverge, st
 - **Measuring your own input and calling it a bound.** An empirical bias or an in-sample predictor score is a diagnostic, not a min-entropy guarantee for the input distribution. The extraction budget must come from a validated model or assessment — here, the exact most-likely-path bound of the configured model.
 - **Extracting more than you have.** The LHL bound is brutal and exact: once m exceeds k the guarantee is vacuous, and no output-facing test will warn you.
 - **Claiming more entropy than the device has.** Health-test cutoffs derive from the claim; claim H = 1 for a 53/47 device and the APT false-alarms ~1,000× its nominal 2⁻²⁰ rate. Commissioning ties the claim to the model bound, and degradation below the claim is flagged instead of silently reinterpreted.
-- **Confusing health tests with entropy estimation.** RCT/APT detect death and gross degradation. A manufacturer-keyed PRNG passes both forever.
+- **Confusing health tests with entropy estimation.** RCT/APT detect death and gross degradation. A manufacturer-keyed PRNG can pass both while remaining predictable to its manufacturer.
 
 ## Real-World Usage
 
@@ -86,3 +86,9 @@ Everything runs in-browser on 4,096-bit streams. The heaviest operation is a 256
 ## System construction bridge
 
 The live demo now links the [SP 800-90C final](https://csrc.nist.gov/pubs/sp/800/90/c/final) construction classes to source health, conditioning and fresh-input dependencies. DRBG Arena’s class chooser is a source-request model, not a validated RBG or a replacement for the existing compromise experiments.
+
+## Health-test workshop and attribution
+
+The “source has failed” workshop compares bias, repeat dependence, a stuck detector, and predictable alternation. Adjust the APT window and alarm count or the RCT run cutoff; compare early false alarms, eligible detections, missed failures, and detection delays over 64 reproducible public-seed trials. The separate commissioned monitor and extractor gate keep their existing settings. Small simulations cannot establish rare-event rates: the panel separately calculates the binary IID APT probability, including its random reference and initial count. Exhaustive short-sequence enumeration checks that calculation.
+
+**Credit:** Joshua E. Hill, *[The SP 800-90B Approved Health Tests and Their Cutoffs](https://www.untruth.org/~josh/sp80090b/N23A%20HillJ%20The%20SP800-90B%20Approved%20Health%20Tests%20and%20Their%20Cutoffs.pdf)*, ICMC, version 20240919, especially slides 2–8 and 13–17, informs the lesson on failure-specific power, threshold selection, and window/delay tradeoffs. Crypto Lab wrote the experiment, models, probability calculations, and tests; no slide graphics, code, or numerical tables were copied. Hill has not reviewed or endorsed this lab. Normative test definitions remain [NIST SP 800-90B §4.4](https://csrc.nist.gov/pubs/sp/800/90/b/final); alternate settings in the workshop are educational, not validated configurations.
