@@ -6,7 +6,7 @@ import type { APTResult, BitStream, RCTResult } from './types.ts'
  * These run FOREVER inside a real entropy source. They are not entropy
  * estimators — they are tripwires for catastrophic failure (a stuck detector,
  * a dead laser), tuned so a healthy source at the claimed entropy level
- * false-alarms with probability α = 2^-20 per test evaluation.
+ * uses nominal tail target α = 2^-20. Actual false-alarm probability is model-dependent.
  */
 
 const ALPHA_EXP = 20 // α = 2^-20, the SP 800-90B recommended false-positive rate

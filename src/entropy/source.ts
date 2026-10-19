@@ -47,7 +47,7 @@ export function cryptoRandom(): number {
   return ((buf[0] >>> 11) * 4294967296 + buf[1]) / 9007199254740992
 }
 
-/** Deterministic xorshift128 RNG for reproducible tests — never used by the UI. */
+/** Deterministic xorshift128 RNG for tests and the public-seed health workshop; never key material. */
 export function makeTestRng(seed: number): () => number {
   let x = seed >>> 0 || 0x9e3779b9
   let y = 0x243f6a88
