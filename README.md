@@ -1,6 +1,6 @@
 # Quantum Entropy — crypto-lab
 
-**QRNG · min-entropy · randomness extraction.** A *modeled* biased beam-splitter QRNG — the bits come from the browser CSPRNG, not from photons — feeding the real entropy accounting and the real extractor that turn a stream nobody can predict into a stream nobody can distinguish.
+**QRNG · min-entropy · randomness extraction.** A *modeled* biased beam-splitter QRNG — the bits come from the browser CSPRNG, not from photons — feeding real entropy accounting and a real extractor that turns a partially predictable stream into fewer bits with an explicit statistical-distance bound.
 
 ## What It Is
 
@@ -8,7 +8,7 @@ An interactive, browser-only demo of the front half of a randomness stack: a **m
 
 **Two lanes, kept separate on purpose.** Every number used for cryptographic accounting (the extraction budget k, the health-test claim, the attacker-work figure) comes from the **configured source model** — for this repeat-or-fresh Markov model, the exact probability of its most likely 256-bit path, computed by dynamic program and verified against exhaustive enumeration in tests. Statistics measured on the emitted sample (bias p̂, predictor accuracy) are displayed as **observed diagnostics** and are never promoted into a guarantee — measuring your own input and calling it a bound is the classic accounting sin this lab exists to teach.
 
-The concept it teaches: a quantum source is unpredictable by physics, not by assumption — **and it is still not usable as a key**. Raw quantum output is biased, correlated, and partially known to whoever built the hardware. Min-entropy measures what's actually there; an extractor converts it into uniform bits. The gap between "unpredictable" and "uniform" is where QRNG marketing lives and where the real engineering happens.
+The concept it teaches: a quantum source is unpredictable by physics, not by assumption — **and it is still not usable as a key**. Raw quantum output is biased, correlated, and partially known to whoever built the hardware. Min-entropy measures what's actually there; an extractor converts it into fewer bits whose distribution is bounded close to uniform. The gap between "unpredictable" and "uniform" is where QRNG marketing lives and where the real engineering happens.
 
 **What's real vs modeled:** the photon source is a labeled **model** (the browser CSPRNG plays the role of the quantum process, so the imperfections — detector mismatch, afterpulsing correlation, a stuck detector — are learner-controllable). Everything downstream of the raw bit stream is real math running on those actual bits: the entropy measurements, the debiaser, the GF(2) matrix–vector multiply, the LHL arithmetic, and the 800-90B tests with their spec-derived cutoffs.
 
@@ -54,7 +54,7 @@ The discipline shown here — characterize a physical source's min-entropy, run 
 ```bash
 npm ci
 npm run dev        # Vite dev server
-npm test           # 47 Vitest unit tests, incl. 8 spec KATs and exhaustive oracles
+npm test           # 51 Vitest unit tests, incl. 8 formula/procedure KATs and exhaustive oracles
 npm run build      # typecheck + production build
 npm run test:a11y  # axe WCAG 2.1 A/AA gate (both themes) + health-gate + responsive checks, port 4337
 ```
@@ -68,8 +68,8 @@ npm run test:a11y  # axe WCAG 2.1 A/AA gate (both themes) + health-gate + respon
 
 ## Build & Verify
 
-- **47 unit tests** (Vitest, colocated `src/**/*.test.ts`), all passing.
-- **8 spec known-answer tests:** Shannon/min-entropy at p = 0.53 (0.9974 / 0.9159), p = 0.5 and p = 0.75; von Neumann's 1951 pairing procedure; a hand-computed 4×4 Toeplitz GF(2) vector; SP 800-90B RCT cutoffs (the spec's own worked example H = 7.3 → C = 4, and H = 1 → C = 21); the binary APT cutoff (W = 1024, α = 2⁻²⁰ → C = 589).
+- **51 unit tests** (Vitest, colocated `src/**/*.test.ts`), all passing.
+- **8 formula/procedure known-answer tests:** Shannon/min-entropy at p = 0.53 (0.9974 / 0.9159), p = 0.5 and p = 0.75; von Neumann's 1951 pairing procedure; a hand-computed 4×4 Toeplitz GF(2) vector; SP 800-90B RCT cutoffs (the publication's worked example H = 2 → C = 11, and H = 1 → C = 21); the binary APT cutoff (W = 1024, α = 2⁻²⁰ → C = 589).
 - **Oracle and invariant tests:** the block min-entropy dynamic program proven equal to exhaustive enumeration over all sequences for n ≤ 10 across a bias/persistence grid, with its i.i.d. (n·H∞) and stuck (k = 0) reductions; RCT/APT monitors alarm at identical lifetime positions under every tested chunk split, including a cross-boundary run that per-chunk batch evaluation provably misses; alarms latch against healthy data; the LHL output-length solve honors its target ε and fails it at m+1; GF(2) linearity; exhaustive 2-universality at m = n = 3; exact debiasing; ~p(1−p) throughput; the debiaser-passes-bias-while-predictable failure; and fail-closed domain validation on the mathematical API.
 - **Browser gate:** `npm run build && npm run test:a11y` — zero axe-core WCAG 2.1 A/AA violations in **both** themes against the production build with every panel driven into its post-interaction states (including latched-alarm states); a semantic check that the latched health alarm disables extraction until repair + recommission; and no horizontal overflow at 320, 390, and 768 px. Enforced in CI before deploy.
 

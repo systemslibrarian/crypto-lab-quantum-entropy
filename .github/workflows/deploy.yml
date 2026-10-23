@@ -9,71 +9,137 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
+  # Superseded PR runs may be cancelled, but a main publication must finish.
   group: pages-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      matrix:
+        # Vite 8 and Vitest 5 support current Node 22 and 24 releases.
+        node-version: [22.x, 24.x]
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
       - uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: ${{ matrix.node-version }}
           cache: npm
+
       - run: npm ci
-      - name: Unit tests (Vitest, incl. spec KATs)
+
+      - name: Unit tests and pinned formula/procedure checks
         run: npm test
+
       - name: Build (typecheck gates the build)
         run: npm run build
+
+      - name: Audit locked dependencies (fail on high+)
+        run: npm audit --audit-level=high
+
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build (typecheck gates the build)
+        run: npm run build
+
       - name: Install Playwright browser
-        run: npx playwright install --with-deps chromium
-      - name: Accessibility gate (axe-core, WCAG A/AA, both themes)
+        run: npx playwright install chromium
+
+      # `playwright test` runs the accessibility, claims, and workshop suites.
+      - name: Accessibility, claims, and workshop gate (Playwright)
         run: npm run test:a11y
-      - uses: actions/configure-pages@v6
+
       - uses: actions/upload-pages-artifact@v5
+        if: github.event_name != 'pull_request'
         with:
           path: dist
 
+  configure-pages:
+    if: github.event_name != 'pull_request'
+    needs: [test, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      pages: write
+      id-token: write
+    steps:
+      # This privileged job never checks out or executes repository code.
+      - uses: actions/configure-pages@v6
+
   deploy:
     if: github.event_name != 'pull_request'
-    needs: build
+    needs: configure-pages
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      pages: write
+      id-token: write
+    outputs:
+      page_url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
         uses: actions/deploy-pages@v5
 
-  # Dependabot only. Runs after the gate above, so a bump can only merge itself
-  # if this lab's own tests, build and axe/e2e run went green on the PR.
-  # Majors are deliberately excluded -- the 2026-08-18 batch had to hold back 109
-  # bumps and they were overwhelmingly majors (@noble v2 dropped export subpaths,
-  # TypeScript 7, vitest 4), so those still want a human.
+  verify-deploy:
+    if: github.event_name != 'pull_request'
+    needs: deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Verify the published route
+        env:
+          PAGES_URL: ${{ needs.deploy.outputs.page_url }}
+        run: |
+          curl --fail --show-error --silent --location \
+            --retry 10 --retry-delay 5 --retry-all-errors --max-time 15 \
+            "$PAGES_URL" --output "$RUNNER_TEMP/quantum-entropy.html"
+          grep -F '<title>Quantum Entropy — crypto-lab</title>' \
+            "$RUNNER_TEMP/quantum-entropy.html"
+
+  # Dependabot only. Deterministic tests and the browser gate must pass before
+  # a non-major bump can merge. Major updates remain open for human review.
   dependabot-auto-merge:
-    needs: build
+    needs: [test, build]
     if: github.event_name == 'pull_request' && github.actor == 'dependabot[bot]'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: write
       pull-requests: write
-      actions: write   # required by the deploy dispatch; without it gh workflow run 403s
+      actions: write
     steps:
       - id: meta
         uses: dependabot/fetch-metadata@v3
-      # Majors included on purpose. `needs:` above already required the whole
-      # gate to pass, and that gate -- unit tests, build, axe WCAG and the e2e
-      # claims -- judges a bump far better than its version number does. A major
-      # that actually breaks this lab fails the gate and stays open for a human.
-      - name: Merge any bump whose gate went green
-        # Retry: a sibling PR merging first moves main underneath us and GitHub
-        # rejects with "Base branch was modified". That is benign, so try again
-        # rather than failing the run over a race.
+
+      - name: Leave major updates for human review
+        if: endsWith(steps.meta.outputs.update-type, 'semver-major')
+        run: echo "Major update detected; automatic merge is intentionally disabled."
+
+      - name: Merge a non-major bump whose gate went green
+        if: ${{ !endsWith(steps.meta.outputs.update-type, 'semver-major') }}
         run: |
           merged=""
           for attempt in 1 2 3; do
@@ -85,17 +151,12 @@ jobs:
             sleep 15
           done
           if [ -z "$merged" ]; then
-            echo "::warning::gate passed but the merge did not land after 3 attempts;"
-            echo "::warning::leaving this PR open - Dependabot will rebase and retry."
-            exit 0
+            echo "::error::gate passed but the merge did not land after 3 attempts"
+            exit 1
           fi
-          # A merge made with GITHUB_TOKEN raises no push event -- GitHub suppresses
-          # them so workflows cannot retrigger themselves -- so deploy would never run
-          # and the site would keep serving the previous build. Ask for it explicitly;
-          # a workflow_dispatch through the API is not suppressed. The dispatched run
-          # is the same gate-then-deploy pipeline, so a bad merge still ships nothing.
-          gh workflow run deploy.yml --repo "$GITHUB_REPOSITORY" --ref main \
-            || echo "::warning::deploy dispatch failed; run deploy.yml by hand"
+          # GITHUB_TOKEN merges do not emit a push event, so dispatch the same
+          # gate-and-deploy workflow explicitly and fail if dispatch fails.
+          gh workflow run deploy.yml --repo "$GITHUB_REPOSITORY" --ref main
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
