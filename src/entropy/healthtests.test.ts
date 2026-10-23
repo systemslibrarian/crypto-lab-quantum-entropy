@@ -12,8 +12,8 @@ import {
 import { generateBits, makeTestRng } from './source.ts'
 
 describe('SP 800-90B §4.4.1 Repetition Count Test', () => {
-  it('KAT: the spec worked example — H = 7.3 → C = 1 + ⌈20/7.3⌉ = 4', () => {
-    expect(rctCutoff(7.3)).toBe(4)
+  it('KAT: the SP 800-90B worked example — H = 2 → C = 1 + ⌈20/2⌉ = 11', () => {
+    expect(rctCutoff(2)).toBe(11)
   })
 
   it('KAT: full-entropy binary source H = 1 → C = 21', () => {
