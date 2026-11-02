@@ -23,6 +23,12 @@ The concept it teaches: a quantum source is unpredictable by physics, not by ass
 5. **Continuous health tests (SP 800-90B §4.4 RCT + APT)** — cutoffs derive from a *commissioned* per-sample entropy claim (0.915 bit/sample for the default 53/47 device — claiming H = 1 for it would false-alarm the APT roughly a thousand times too often, a mistake an earlier version of this lab made and now teaches). Monitor state persists across emissions, runs and windows straddle chunk boundaries correctly, and an alarm **latches**: the extractor refuses input until you repair the source and explicitly recommission. Stick a detector: bits keep flowing while the boundary slams shut — a dead source outputs a beautiful constant.
 6. **The architecture** — where this sits in SP 800-90C, which stages the sibling demos own, and the one construction that doesn't require trusting the manufacturer (device-independent, Bell-certified randomness — named, linked to e91's CHSH exhibit, deliberately not built).
 
+### High entropy rate versus uniformity
+
+Exhibit 4 includes a separate 1,000-bit distribution model: vary a public zero prefix of length d while the remaining bits are independent and fair. It calculates min-entropy 1,000−d, entropy rate, and total variation distance 1−2⁻ᵈ. At d=10, the rate is 99% but distance from uniform is 1023/1024. An exhaustive small-distribution test checks the calculation and both endpoints. This is not a physical-source certificate, quantum implementation, or change to the existing 256-bit extractor.
+
+Related research: Jain, Mutreja and Roberts, [Certified Randomness with Optimal Rate](https://arxiv.org/abs/2609.38945), 30 September 2026 (preprint, quantum random oracle model). The example illustrates a distinction between guarantees; it does not reproduce or refute the paper. Secrecy also depends on adversary information: published beacon output is not a secret OTP.
+
 ## When to Use It
 
 - To understand why "quantum RNG" on a spec sheet is the *start* of a security argument, not the end of one.
