@@ -37,6 +37,15 @@
   color-scheme: dark;
 }
 
+#kdf-calculator { scroll-margin-top: 6rem; }
+.kdf-controls label { min-width: 0; }
+.kdf-controls input, .kdf-controls select { width: 100%; min-width: 0; }
+.kdf-assumption { display: flex; align-items: center; gap: .75rem; margin: 1rem 0; }
+.kdf-assumption input { appearance: none; width: 1.5rem; height: 1.5rem; flex-shrink: 0; display: grid; place-content: center; background: var(--panel-2); border: 2px solid var(--control-border); border-radius: 3px; }
+.kdf-assumption input:checked::before { content: '✓'; color: var(--text); font-size: 1.1rem; font-weight: 700; }
+.kdf-result { padding: 1rem; margin: 1rem 0; background: var(--panel-2); border: 1px solid var(--border); border-radius: .75rem; }
+.kdf-bound { font-size: 1.6rem; font-weight: 700; overflow-wrap: anywhere; }
+
 :root[data-theme='light'] {
   --accent: #6154dc;
   --bg: #f4f4f9;

@@ -7,6 +7,7 @@ import { initSourcePanel } from './ui/sourcePanel.ts'
 import { regenerate } from './ui/state.ts'
 import { initToeplitzPanel } from './ui/toeplitzPanel.ts'
 import { initVNPanel } from './ui/vnPanel.ts'
+import { initKdfPanel } from './ui/kdfPanel.ts'
 
 initSourcePanel($('#panel-source'))
 initEntropyPanel($('#panel-entropy'))
@@ -14,6 +15,7 @@ initVNPanel($('#panel-vn'))
 initToeplitzPanel($('#panel-toeplitz'))
 initHealthPanel($('#panel-health'))
 initHealthWorkshop($('#panel-health-workshop'))
+initKdfPanel($('#kdf-calculator'))
 
 // Initial stream so every panel shows the default 53/47 device on load.
 regenerate()
