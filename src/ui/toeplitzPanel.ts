@@ -3,6 +3,7 @@ import { fractionOnes, markovPredictorAccuracy, minEntropy } from '../entropy/me
 import { lhlEpsilon, toeplitzExtract } from '../entropy/toeplitz.ts'
 import type { ToeplitzResult } from '../entropy/types.ts'
 import { $, bitsToHex, fmt, html, pct, sci } from './dom.ts'
+import { initPrefixPanel } from './prefixPanel.ts'
 import { BLOCK_LEN, state, subscribe } from './state.ts'
 
 const N = BLOCK_LEN // input bits taken from the raw stream
@@ -27,6 +28,7 @@ export function initToeplitzPanel(root: HTMLElement): void {
       raw stream. Choose the output length, then extract — and try demanding more bits than the
       model contains.
     </p>
+    <div id="prefix-panel"></div>
     <div class="controls">
       <div class="field">
         <label for="tp-m">Output length m = <output id="tp-m-out">128</output> bits</label>
@@ -89,6 +91,8 @@ export function initToeplitzPanel(root: HTMLElement): void {
     </details>
   `,
   )
+
+  initPrefixPanel($('#prefix-panel', root))
 
   const mSlider = $('#tp-m', root) as HTMLInputElement
   let last: ToeplitzResult | null = null

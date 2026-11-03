@@ -247,7 +247,8 @@ export async function boot(page: Page, theme: 'dark' | 'light'): Promise<void> {
 
   // Five inline disclosures, all shut. `driveDemos()` used to open them from
   // script; here they are only ever opened by clicking their summary.
-  await expect(page.locator('#app details')).toHaveCount(5)
+  await expect(page.locator('#app details:not(#prefix-panel details)')).toHaveCount(5)
+  await expect(page.locator('#prefix-panel details')).toHaveCount(1)
   await expect(page.locator('#app details[open]')).toHaveCount(0)
 
   await settle(page)
@@ -699,7 +700,7 @@ export async function scan(page: Page, label: string): Promise<void> {
 
 /** Open one `<details>` by clicking its summary, and assert it opened. */
 async function openDisclosure(page: Page, index: number): Promise<void> {
-  const d = page.locator('#app details').nth(index)
+  const d = page.locator('#app details:not(#prefix-panel details)').nth(index)
   await d.locator('summary').click()
   await expect(d).toHaveAttribute('open', '')
 }
