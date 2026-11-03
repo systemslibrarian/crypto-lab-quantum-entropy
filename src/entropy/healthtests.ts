@@ -15,7 +15,7 @@ const ALPHA_EXP = 20 // α = 2^-20, the SP 800-90B recommended false-positive ra
  * Repetition Count Test cutoff (SP 800-90B §4.4.1):
  *   C = 1 + ⌈-log₂α / H⌉ = 1 + ⌈20/H⌉
  * where H is the claimed min-entropy per sample. For a full-entropy binary
- * source (H = 1): C = 21. The spec's own worked example: H = 7.3 → C = 4.
+ * source (H = 1): C = 21. The publication's worked example uses H = 2 → C = 11.
  */
 export function rctCutoff(h: number): number {
   if (!(h > 0)) throw new Error(`claimed min-entropy must be positive, got ${h}`)

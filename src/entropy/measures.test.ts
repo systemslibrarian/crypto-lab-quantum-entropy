@@ -8,7 +8,7 @@ import {
 } from './measures.ts'
 import { generateBits, makeTestRng } from './source.ts'
 
-describe('Shannon vs min-entropy (spec KATs)', () => {
+describe('Shannon vs min-entropy (formula KATs)', () => {
   it('KAT: p = 0.53 — the brief headline numbers', () => {
     // Shannon reads "99.7% random"; min-entropy says an optimal guesser faces only 0.9159 bits
     expect(shannonEntropy(0.53)).toBeCloseTo(0.9974, 4)
