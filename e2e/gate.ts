@@ -217,8 +217,8 @@ export async function boot(page: Page, theme: 'dark' | 'light'): Promise<void> {
 
   // Every panel body is written by `src/ui/*.ts` into an empty `<section>`, so a
   // navigation that resolves proves nothing about what is on screen.
-  await expect(page.locator('#app section.panel')).toHaveCount(8)
-  for (const id of ['source-h', 'entropy-h', 'vn-h', 'toeplitz-h', 'health-h', 'workshop-h']) {
+  await expect(page.locator('#app section.panel')).toHaveCount(9)
+  for (const id of ['source-h', 'entropy-h', 'vn-h', 'toeplitz-h', 'health-h', 'workshop-h', 'kdf-h']) {
     await expect(page.locator(`#${id}`)).toBeVisible()
   }
 
@@ -247,7 +247,7 @@ export async function boot(page: Page, theme: 'dark' | 'light'): Promise<void> {
 
   // Five inline disclosures, all shut. `driveDemos()` used to open them from
   // script; here they are only ever opened by clicking their summary.
-  await expect(page.locator('#app details:not(#prefix-panel details)')).toHaveCount(5)
+  await expect(page.locator('#app details:not(#prefix-panel details):not(#kdf-calculator details)')).toHaveCount(5)
   await expect(page.locator('#prefix-panel details')).toHaveCount(1)
   await expect(page.locator('#app details[open]')).toHaveCount(0)
 
@@ -700,7 +700,7 @@ export async function scan(page: Page, label: string): Promise<void> {
 
 /** Open one `<details>` by clicking its summary, and assert it opened. */
 async function openDisclosure(page: Page, index: number): Promise<void> {
-  const d = page.locator('#app details:not(#prefix-panel details)').nth(index)
+  const d = page.locator('#app details:not(#prefix-panel details):not(#kdf-calculator details)').nth(index)
   await d.locator('summary').click()
   await expect(d).toHaveAttribute('open', '')
 }
