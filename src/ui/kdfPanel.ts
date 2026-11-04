@@ -29,6 +29,9 @@ export function initKdfPanel(root: HTMLElement): void {
       The source bound k must apply under the stated adversary-information model. These inputs are assumptions, not estimates
       from sample bytes; this lesson does not establish a quantum-side-information extension.</p>
     <div id="kdf-result" class="kdf-result" role="status" aria-live="polite" aria-atomic="true"></div>
+    <p id="kdf-proof-scope" class="note">These sufficient bounds remain supported under the stated assumptions.
+      A separate reverse claim in the source paper is false as written for deterministic tests;
+      the corrected statement accounts for their whole-outcome acceptance budget. That correction does not change these calculations.</p>
     <details><summary>Explain the two routes and their limits</summary><div>
       <p>All logarithms are base 2. For integer b from 6 to 256:</p>
       <ul><li><strong>No entropy loss:</strong> k = m, at least (b + 1)-wise independence; bound (b + 1) × 2⁻ᵇ.</li>
@@ -36,14 +39,24 @@ export function initKdfPanel(root: HTMLElement): void {
           bound 3 × 2⁻ᵇ. The hash-independence requirement is a conservative sufficient one.</li></ul>
       <p>The sufficient argument splits outcomes into a bad set of mass at most η and a remainder whose probability density
         is at most t times uniform. A test with uniform-input success at most δ then succeeds with probability at most
-        η + tδ. The paper’s balance bounds supply η and t. This calculation does not use the disputed converse Lemma 3.6.</p>
+        η + tδ. The paper’s balance bounds supply η and t. This forward calculation does not require a converse.</p>
       <p>The results are application failure bounds. They do not give output min-entropy, distance from uniform, an HKDF guarantee,
         or a security certificate for a device. The calculator deliberately leaves intermediate entropy gaps unsupported.</p>
+    </div></details>
+    <details id="kdf-converse"><summary>What was corrected in the reverse claim?</summary><div>
+      <p>The reverse claim asks whether limits on every allowed test force the distribution to have few unusually likely outcomes.
+        A deterministic test accepts a whole number of output-and-seed pairs. If its budget permits 2.4 pairs, it can accept only two.</p>
+      <p>For N equally weighted reference outcomes and a uniform-test budget δ, use q = ⌊δN⌋ and δ_eff = q/N.
+        If q ≥ 1 and every allowed deterministic test succeeds with probability at most ε, the corrected density threshold is
+        t = ε/δ_eff. The probability of outcomes above that threshold is at most ε. If q = 0, the test premise is vacuous.</p>
+      <p>The original threshold t = ε/δ follows when δN is an integer, or from a stronger premise that also covers randomized tests.
+        Neither version certifies the source assumptions entered above.
+        <a href="https://github.com/systemslibrarian/crypto-lab/blob/main/docs/kdf-converse-resolution-2026-11-04.md">Read the corrected statements, proofs and exact counterexample</a>.</p>
     </div></details>
     <p class="note">Source: Dodis, Pietrzak and Wichs,
       <a href="https://eprint.iacr.org/2013/708">Key Derivation Without Entropy Waste</a> (6 February 2014),
       Corollaries 4.3 and 4.5, PDF pp. 11–12.
-      <a href="https://github.com/systemslibrarian/crypto-lab/blob/main/docs/kdf-calculator-investigation-2026-11-03.md">Scope and converse-proof investigation</a>.</p>`
+      <a href="https://github.com/systemslibrarian/crypto-lab/blob/main/docs/kdf-converse-resolution-2026-11-04.md">Scope and corrected converse</a>.</p>`
   const number = (id: string) => ($(`#kdf-${id}`, root) as HTMLInputElement).valueAsNumber
   const value = (id: string) => ($(`#kdf-${id}`, root) as HTMLSelectElement).value
   const model = $('#kdf-model', root) as HTMLInputElement
