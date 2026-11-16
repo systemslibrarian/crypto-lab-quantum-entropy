@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
+import { auditControlNames, formatControlNameFailures } from './control-names'
 
 test('failure workshop exposes misses, threshold changes, and source credit', async ({ page }) => {
   await page.goto('./')
@@ -16,4 +17,7 @@ test('failure workshop exposes misses, threshold changes, and source credit', as
   await page.setViewportSize({width:390,height:844})
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
   expect((await new AxeBuilder({page}).include('#panel-health-workshop').analyze()).violations).toEqual([])
+  // axe's `label` rule accepts a bare `placeholder` as an accessible name, so a
+  // deleted label can leave this gate green. See `control-names.ts`.
+  expect(formatControlNameFailures(await auditControlNames(page)), 'form controls named only by placeholder/title in the failure workshop').toEqual([])
 })

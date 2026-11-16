@@ -1,4 +1,5 @@
 import AxeBuilder from '@axe-core/playwright';
+import { auditControlNames, formatControlNameFailures } from './control-names';
 import { expect, test } from '@playwright/test'
 
 test('known-prefix model updates its independent entropy and uniformity guarantees', async ({ page }) => {
@@ -21,5 +22,8 @@ test('known-prefix model updates its independent entropy and uniformity guarante
   await expect(page.getByText('Check whether the first d bits are all zero.', { exact: false })).toBeVisible()
   const accessibility = await new AxeBuilder({ page }).include('#prefix-panel').withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze();
   expect(accessibility.violations).toEqual([]);
+  // axe's `label` rule accepts a bare `placeholder` as an accessible name, so a
+  // deleted label can leave this gate green. See `control-names.ts`.
+  expect(formatControlNameFailures(await auditControlNames(page)), 'form controls named only by placeholder/title in the known-prefix model').toEqual([]);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
 })
