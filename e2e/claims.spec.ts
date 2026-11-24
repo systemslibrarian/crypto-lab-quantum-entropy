@@ -311,19 +311,19 @@ test('both entropy numbers are recomputed from the bias the page measured', asyn
 
   // The headline and the "advertised" box quote the SAME live Shannon figure at
   // two precisions — a hardcoded 99.7% here was a real bug once.
-  expect(await text(page, '#ent-headline-shannon')).toBe(pct(hSh))
-  expect(await text(page, '#entropy-h')).toContain(pct(hSh))
+  expect(await text(page, '#ent-headline-shannon')).toBe(fmt(hSh))
+  expect(await text(page, '#entropy-h')).toContain(fmt(hSh))
   const boxes = await verdicts(page, '#ent-verdicts')
-  expect(boxes[0].main).toBe(`“${pct(hSh, 2)} random!”`)
+  expect(boxes[0].main).toBe(`${fmt(hSh)} bits/bit`)
 
   // The chargeable box states the gap it is warning about, and it is the real gap.
-  expect(boxes[1].main).toContain(fmt(hMin))
+  expect(boxes[1].main).toContain(fmt((await modelK(page)) / BLOCK_LEN))
   expect(boxes[1].note).toContain(`Gap to Shannon: ${fmt(hSh - hMin)} bits/bit`)
 })
 
 test('the headline tracks the live measurement after the bias changes', async ({ page }) => {
   const first = await text(page, '#ent-headline-shannon')
-  const firstK = num(pick(await statGrid(page, '#ent-stats'), 'Naive').value.replace('2^', ''))
+  const firstK = num(pick(await statGrid(page, '#ent-stats'), 'whole 256-bit block').value.replace('2^−', ''))
 
   await setBias(page, 70)
 
@@ -333,14 +333,14 @@ test('the headline tracks the live measurement after the bias changes', async ({
 
   // No stale verdict: the headline, the H2 around it and the advertised box all
   // moved to the new measurement.
-  expect(await text(page, '#ent-headline-shannon')).toBe(pct(hSh))
+  expect(await text(page, '#ent-headline-shannon')).toBe(fmt(hSh))
   expect(await text(page, '#ent-headline-shannon')).not.toBe(first)
   const boxes = await verdicts(page, '#ent-verdicts')
-  expect(boxes[0].main).toBe(`“${pct(hSh, 2)} random!”`)
+  expect(boxes[0].main).toBe(`${fmt(hSh)} bits/bit`)
 
-  // ... and so did the model's attacker-work figure, downward.
+  // ... and so did the model block min-entropy exponent, downward.
   const k = await modelK(page)
-  expect(pick(await statGrid(page, '#ent-stats'), 'Naive').value).toBe(`2^${fmt(k, 1)}`)
+  expect(pick(await statGrid(page, '#ent-stats'), 'whole 256-bit block').value).toBe(`2^−${fmt(k, 1)}`)
   expect(k).toBeLessThan(firstK)
 })
 
@@ -351,16 +351,16 @@ test('the chargeable figure is the model bound, and panels 2 and 4 quote the sam
   const ent = await statGrid(page, '#ent-stats')
   const tp = await statGrid(page, '#tp-stats')
 
-  // Panel 2's attacker-work figure and panel 4's extraction budget are the same
+  // The exponent of panel 2’s one-guess probability and panel 4’s entropy budget are the same
   // quantity — the model's most-likely-path bound — so they must agree exactly.
-  expect(pick(ent, 'Naive').value).toBe(`2^${fmt(k, 1)}`)
+  expect(pick(ent, 'whole 256-bit block').value).toBe(`2^−${fmt(k, 1)}`)
   expect(pick(tp, 'Model min-entropy in').value).toBe(`${fmt(k, 1)} bits`)
   expect(k).toBeLessThan(BLOCK_LEN)
 
   // The Shannon comparison in the same note is the sample figure times 256 —
-  // the "20+ bits of work" overstatement the README is about.
+  // an independence-based comparison with the sample.
   const { p } = await measuredBias(page)
-  expect(pick(ent, 'Naive').note).toContain(`2^${fmt(BLOCK_LEN * shannonEntropy(p), 1)}`)
+  expect(pick(ent, 'whole 256-bit block').note).toContain(`${fmt(BLOCK_LEN * shannonEntropy(p), 1)} bits`)
   expect(BLOCK_LEN * shannonEntropy(p)).toBeGreaterThan(k)
 })
 
@@ -746,15 +746,15 @@ test('a dead source is charged zero entropy by every panel that reports on it', 
   expect(pick(ent, 'Shannon H').value).toBe('0.0000 bits/bit')
   expect(pick(ent, 'Min-entropy H').value).toBe('0.0000 bits/bit')
   expect(pick(ent, 'single guess').value).toBe('100.0%')
-  expect(pick(ent, 'Naive').value).toBe('1 guess')
+  expect(pick(ent, 'whole 256-bit block').value).toBe('100%')
 
   // Regression: the chargeable verdict used to print "✓ 0.0000 bits/bit" here.
   // H − H∞ is zero at BOTH ends of the scale, so the gap test that means
   // "unbiased" at p = 0.5 also read clean for a detector welded to 1 — a ✓ in
-  // the same panel that prints "1 guess" beside it.
+  // the same panel that prints a certain (100%) one-guess probability beside it.
   const entBox = (await verdicts(page, '#ent-verdicts'))[1]
   expect(entBox.main).not.toContain('✓')
-  expect(entBox.main).toBe('⚠ dependence detected — model rate 0.0000 bits/bit')
+  expect(entBox.main).toBe('⚠ model rate 0.0000 bits/bit')
   expect(entBox.note).toContain('predictor guesses 100.0% of this sample’s bits')
 
   // Panel 3: every pair is equal, so nothing survives the debiaser.

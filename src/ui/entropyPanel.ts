@@ -8,7 +8,7 @@ import {
 import { $, fmt, html, pct } from './dom.ts'
 import { BLOCK_LEN, subscribe } from './state.ts'
 
-/** Chart geometry: p ∈ [0.5, 1] → x, entropy ∈ [0, 1] → y. */
+/** Chart geometry: most frequent bit fraction p ∈ [0.5, 1] → x, entropy ∈ [0, 1] → y. */
 const W = 460
 const H = 260
 const PAD = { l: 44, r: 14, t: 12, b: 34 }
@@ -29,18 +29,17 @@ export function initEntropyPanel(root: HTMLElement): void {
     root,
     `
     <p class="kicker">2 · Headline — the two numbers</p>
-    <h2 id="entropy-h">Shannon says “<span id="ent-headline-shannon">99.7%</span> random.” Min-entropy says otherwise.</h2>
+    <h2 id="entropy-h">Shannon entropy is <span id="ent-headline-shannon">0.9974</span> bits per bit. How likely is one correct guess?</h2>
     <p class="lede">
       Both measurements below run live on the same raw stream. Shannon entropy is the
-      <em>average</em> surprise across all outcomes — the number that ends up in marketing.
-      Min-entropy is the <em>worst case</em>: the single most likely outcome, because an attacker
-      trying to guess your bit only guesses once, and guesses optimally. Slide the detector
+      <em>average</em> surprise across all outcomes.
+      Min-entropy is the <em>worst case</em>: the single most likely outcome, and gives the success probability of one optimal guess. Slide the detector
       mismatch above and watch Shannon barely move while min-entropy falls off a cliff.
     </p>
     <div class="stat-grid" id="ent-stats"></div>
     <div class="chart-wrap">
       <svg viewBox="0 0 ${W} ${H}" role="img" id="ent-chart"
-        aria-label="Chart of Shannon entropy and min-entropy in bits per bit, as functions of the bias P(1) from 0.5 to 1.0. The Shannon curve stays near 1 for small biases; the min-entropy line drops much faster. A marker shows the current measured bias.">
+        aria-label="Chart of Shannon entropy and min-entropy in bits per bit, as functions of the frequency of the more common bit from 0.5 to 1.0. The Shannon curve stays near 1 for small biases; the min-entropy line drops much faster. A marker shows the current measured bias.">
         <line class="axis" x1="${PAD.l}" y1="${py(0)}" x2="${W - PAD.r}" y2="${py(0)}"/>
         <line class="axis" x1="${PAD.l}" y1="${py(0)}" x2="${PAD.l}" y2="${PAD.t}"/>
         <line class="axis" x1="${PAD.l}" y1="${py(1)}" x2="${W - PAD.r}" y2="${py(1)}" stroke-dasharray="3 4"/>
@@ -50,7 +49,7 @@ export function initEntropyPanel(root: HTMLElement): void {
         <text x="${px(0.5)}" y="${H - 12}" text-anchor="middle">50%</text>
         <text x="${px(0.75)}" y="${H - 12}" text-anchor="middle">75%</text>
         <text x="${px(1)}" y="${H - 12}" text-anchor="end">100%</text>
-        <text x="${(PAD.l + W - PAD.r) / 2}" y="${H - 1}" text-anchor="middle">bias P(1)</text>
+        <text x="${(PAD.l + W - PAD.r) / 2}" y="${H - 1}" text-anchor="middle">more common bit frequency</text>
         <path d="${curvePath(shannonEntropy)}" fill="none" stroke="var(--ok-ink)" stroke-width="2.5"/>
         <path d="${curvePath(minEntropy)}" fill="none" stroke="var(--danger-ink)" stroke-width="2.5"/>
         <text x="${px(0.84)}" y="${py(shannonEntropy(0.84)) - 8}" style="fill: var(--ok-ink); font-weight: 700">Shannon H</text>
@@ -68,18 +67,15 @@ export function initEntropyPanel(root: HTMLElement): void {
            <span class="formula">H∞(p) = −log₂ max(p, 1−p)</span></p>
         <p class="note">
           Shannon entropy weights every outcome by how often it occurs — it answers “how well does
-          this stream compress?” Min-entropy keeps only the most likely outcome — it answers “how
-          often does an optimal attacker succeed in one guess?” For keys, only the second question
-          matters: per NIST SP 800-90B, entropy claims for sources are min-entropy claims. For a
-          256-bit key built from bits with H∞ = 0.9159, the attacker’s effective search space is
-          2<sup>234.5</sup>, not 2<sup>255.3</sup> — the Shannon figure overstates the defense by
-          20+ bits of work.
+          an independent source compress in the limit?” Min-entropy gives the largest probability
+          of one outcome. For 256 independent bits with P(1) = 0.53, the most likely string is all
+          ones. Its probability is 0.53<sup>256</sup> ≈ 2<sup>−234.5</sup>. All 2<sup>256</sup> strings
+          remain possible. Computing the mean number of guesses would require their probabilities and guess order.
         </p>
         <p class="note">
-          Caveat these per-bit numbers share: both assume the bits are independent. If the stream
-          is also <em>correlated</em>, even min-entropy-from-bias overstates what is there — that
-          is why, once you add correlation, the chargeable number comes from the configured
-          model’s most-likely-path bound, with the sample predictor shown only as a diagnostic.
+          These per-bit measurements describe the observed frequencies of zeros and ones.
+          Multiplying a per-bit entropy by the block length assumes independence. The block
+          calculation below uses the configured source model and includes its dependence.
         </p>
       </div>
     </details>
@@ -91,64 +87,46 @@ export function initEntropyPanel(root: HTMLElement): void {
     const hSh = shannonEntropy(p)
     const hMin = minEntropy(p)
     const acc = markovPredictorAccuracy(raw)
-    const hCond = acc > 0 && acc < 1 ? -Math.log2(acc) : 0
     const correlated = cfg.persistence > 0 || cfg.stuck !== null
-    // A dead source lands at hCond = hMin = exactly 0 (predictor accuracy 1,
-    // bias 1), and the gap test below reads "no gap" there for the same reason
-    // it does at p = 0.5: H − H∞ vanishes at BOTH ends of the scale. Ties must
-    // take the dependence branch, or a stuck detector gets stamped
-    // "✓ 0.0000 bits/bit" by the same panel that prints "1 guess" beside it.
-    const dependenceRules = correlated && hCond <= hMin
-    // Two lanes: the sample statistics above are diagnostics; anything phrased as
-    // attacker work must come from the configured model, not from the sample.
     const kModel = blockMinEntropy(BLOCK_LEN, cfg)
 
-    // The headline quotes the live Shannon figure, not the default device's. A hardcoded
-    // "99.7%" was true only at 53/47; drag the bias to 70% and the heading contradicted the
-    // statistic printed directly beneath it. This panel's entire argument is that a number
-    // can be true and still mislead — it cannot afford a number that is simply stale.
-    $('#ent-headline-shannon', root).textContent = pct(hSh)
+    $('#ent-headline-shannon', root).textContent = fmt(hSh)
 
     $('#ent-stats', root).innerHTML = `
       <div class="stat"><span class="label">Measured bias P(1)</span>
         <span class="value">${pct(p)}</span></div>
       <div class="stat"><span class="label">Shannon H</span>
         <span class="value">${fmt(hSh)} bits/bit</span>
-        <span class="note">the marketing number</span></div>
+        <span class="note">average surprise at the measured bias</span></div>
       <div class="stat"><span class="label">Min-entropy H∞</span>
         <span class="value">${fmt(hMin)} bits/bit</span>
         <span class="note">what one optimal guess faces</span></div>
       <div class="stat"><span class="label">Attacker’s single guess succeeds</span>
         <span class="value">${pct(Math.max(p, 1 - p))}</span>
         <span class="note">= 2^−H∞ per bit, at the measured bias</span></div>
-      <div class="stat"><span class="label">Naive ${BLOCK_LEN}-bit key — model attacker work</span>
-        <span class="value">${kModel === 0 ? '1 guess' : `2^${fmt(kModel, 1)}`}</span>
-        <span class="note">exact for the configured model (most likely ${BLOCK_LEN}-bit path);
-        Shannon math would claim 2^${fmt(BLOCK_LEN * hSh, 1)}</span></div>
+      <div class="stat"><span class="label">Optimal one-guess success for the whole ${BLOCK_LEN}-bit block</span>
+        <span class="value">${kModel === 0 ? '100%' : `2^−${fmt(kModel, 1)}`}</span>
+        <span class="note">Most likely block in this model. For comparison, ${BLOCK_LEN} times the sample
+        Shannon entropy is ${fmt(BLOCK_LEN * hSh, 1)} bits under an independence assumption.</span></div>
     `
 
-    const pClamped = Math.min(0.999, Math.max(p, 1 - p))
+    const majority = Math.max(p, 1 - p)
     const marker = $('#ent-marker', root)
-    marker.setAttribute('transform', `translate(${px(pClamped).toFixed(1)},0)`)
+    marker.setAttribute('transform', `translate(${px(majority).toFixed(1)},0)`)
 
     const gap = hSh - hMin
     $('#ent-verdicts', root).innerHTML = `
       <div class="verdict-box neutral">
-        <p class="vb-title">Advertised (Shannon)</p>
-        <p class="vb-main">“${pct(hSh, 2)} random!”</p>
-        <p class="vb-note">True as an average — and irrelevant to a one-shot guesser.</p>
+        <p class="vb-title">Sample Shannon entropy</p>
+        <p class="vb-main">${fmt(hSh)} bits/bit</p>
+        <p class="vb-note">Average surprise for the measured bit frequencies.</p>
       </div>
       <div class="verdict-box ${gap > 0.02 || correlated ? 'warn' : 'ok'}">
-        <p class="vb-title">Chargeable (min-entropy)</p>
-        <p class="vb-main">${
-          dependenceRules
-            ? `⚠ dependence detected — model rate ${fmt(kModel / BLOCK_LEN)} bits/bit`
-            : `${gap > 0.02 ? '⚠' : '✓'} ${fmt(hMin)} bits/bit at the measured bias`
-        }</p>
-        <p class="vb-note">${
-          dependenceRules
-            ? `First-order diagnostic: a predictor guesses ${pct(acc)} of this sample’s bits, so bias alone no longer describes the source; the chargeable rate comes from the model’s most-likely-path bound.`
-            : `Gap to Shannon: ${fmt(gap)} bits/bit. Only min-entropy may back a key — and for the extraction budget, only the model bound (panel 4).`
+        <p class="vb-title">Model block min-entropy per bit</p>
+        <p class="vb-main">${kModel === 0 || correlated || gap > 0.02 ? '⚠' : '✓'} model rate ${fmt(kModel / BLOCK_LEN)} bits/bit</p>
+        <p class="vb-note">${correlated
+          ? `First-order diagnostic: a predictor guesses ${pct(acc)} of this sample’s bits. The model rate includes the configured dependence.`
+          : `Gap to Shannon: ${fmt(gap)} bits/bit in the sample. The model rate uses the configured source probabilities.`
         }</p>
       </div>
     `
